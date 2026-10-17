@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulator Level Tangki PJCO / MCO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tema gelap: ruang kontrol malam. Warna terang dipakai untuk fluida yang mengalir dan alarm. */
+  :root, [data-theme="dark"] {
+    --bg: #18212B; --zone: rgba(255,255,255,0.025); --zone-edge: #2A3746;
+    --panel: #1F2A36; --panel2: #263443; --edge: #33475A;
+    --text: #E4EAF0; --text2: #B7C3CE; --muted: #8496A8;
+    --pipe: #4C6073; --equip: #8FA3B6; --shell-a: #3E4F61; --shell-b: #2A3846; --roof: #33445A;
+    --on: #DCE6EE; --on-ink: #18212B;
+    --oil: #D58A3A; --oil-2: #8F5420; --water: #4C9BDB; --water-2: #285F92; --emul: #B8A866;
+    --alm-h: #F2C94C; --alm-hh: #FF5E5E; --ui: #7FB2E5;
+    --t1: #B8A866; --t2: #4C9BDB; --t3: #D58A3A; --t4: #F0C08A; --t5: #7FD1BC; --t6: #C3A6E8; --t7: #F08FA8;
+    --grid: #2B3A4A;
+  }
+  [data-theme="light"] {
+    --bg: #D3D8DD; --zone: rgba(0,0,0,0.03); --zone-edge: #B9C1C9;
+    --panel: #E5E9EC; --panel2: #F3F5F7; --edge: #B6BFC8;
+    --text: #1C2228; --text2: #39434D; --muted: #5F6B77;
+    --pipe: #7A8691; --equip: #4F5A65; --shell-a: #D9DDE1; --shell-b: #B9C0C7; --roof: #C6CDD3;
+    --on: #36414C; --on-ink: #F3F5F7;
+    --oil: #B8732B; --oil-2: #7E4A18; --water: #3D84C2; --water-2: #285A88; --emul: #93834A;
+    --alm-h: #D9A400; --alm-hh: #C62828; --ui: #2F6FB0;
+    --t1: #93834A; --t2: #3D84C2; --t3: #B8732B; --t4: #8E5A1F; --t5: #2E8B74; --t6: #7A55B5; --t7: #C2185B;
+    --grid: #C9D0D6;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  [data-theme="light"] { color-scheme: light; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: "Bahnschrift", "Barlow Semi Condensed", "DIN Alternate", "Segoe UI", Arial, sans-serif;
+         font-size: 15px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  button, select, input { font: inherit; color: var(--text); }
+  :focus-visible { outline: 2px solid var(--ui); outline-offset: 2px; }
+
+  /* Bar atas */
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+            padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--edge); }
+  .brand h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.01em; }
+  .brand p { margin: 0; font-size: 13px; color: var(--muted); }
+  .clockwrap { display: flex; align-items: center; gap: 12px; margin: 0 auto; }
+  .clock { font-size: 26px; font-weight: 600; letter-spacing: 0.02em; min-width: 190px; text-align: center; }
+  .status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text2);
+            padding: 3px 10px; border: 1px solid var(--edge); border-radius: 20px; }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status.run::before { background: #5BD08A; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .btn { padding: 6px 14px; border: 1px solid var(--edge); background: var(--panel2); border-radius: 4px; cursor: pointer; }
+  .btn:hover { border-color: var(--equip); }
+  .btn.primary { background: var(--on); color: var(--on-ink); border-color: var(--on); font-weight: 600; min-width: 104px; }
+  .btn[aria-pressed="true"]:not(.primary) { background: var(--on); color: var(--on-ink); border-color: var(--on); }
+  select { padding: 6px 8px; border: 1px solid var(--edge); background: var(--panel2); border-radius: 4px; }
+
+  /* Tata letak utama */
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; padding: 14px; }
+  .hmi { background: var(--bg); border: 1px solid var(--edge); border-radius: 6px; overflow: auto; }
+  .hmi svg { display: block; width: 100%; height: auto; min-width: 820px; }
+  .stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .viewbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; }
+  .seg .btn { border-radius: 0; min-width: 56px; }
+  .seg .btn:first-child { border-radius: 4px 0 0 4px; }
+  .seg .btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+  .hint { font-size: 13px; color: var(--muted); flex: 1; min-width: 200px; }
+  #camReset { margin-left: auto; }
+  .hmi3d { position: relative; height: min(78vh, 900px); min-height: 460px; border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; background: var(--bg); }
+  .hmi3d[hidden], .hmi[hidden] { display: none; }
+  #c3d { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .msg3d { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--text2); }
+  .msg3d[hidden] { display: none; }
+  aside { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; padding: 4px 16px 16px; align-self: start; }
+  aside section { padding: 12px 0; border-bottom: 1px solid var(--edge); }
+  aside section:last-of-type { border-bottom: none; }
+  aside h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+  label.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 0; color: var(--text2); }
+  input[type=number] { width: 96px; padding: 4px 7px; text-align: right; border: 1px solid var(--edge);
+                       background: var(--panel2); border-radius: 4px; }
+  input[type=range] { width: 100%; accent-color: var(--ui); }
+  .src-grid { display: grid; grid-template-columns: 1fr 84px 62px; gap: 5px 6px; align-items: center; margin: 4px 0 6px; }
+  .src-grid .hd { font-size: 12px; color: var(--muted); }
+  .src-grid input { width: 100%; }
+  .derived { font-size: 13px; color: var(--muted); margin: 4px 0 6px; }
+  .info { font-size: 13px; color: var(--text2); margin: 8px 0 4px; white-space: pre-line; }
+  .info.warn { color: var(--alm-hh); }
+  .wide { width: 100%; margin-top: 6px; }
+  details { font-size: 13px; color: var(--muted); padding-top: 12px; }
+  details summary { cursor: pointer; color: var(--text2); }
+  details p { margin: 6px 0 0; line-height: 1.5; }
+
+  .bottom { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; padding: 0 14px 14px; }
+  .card { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; padding: 12px 14px; }
+  .card-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .card-head h2 { font-size: 16px; font-weight: 600; margin: 0 auto 0 0; }
+  canvas { width: 100%; height: 280px; display: block; }
+  #alarmList { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow: auto; font-size: 14px; }
+  #alarmList li { padding: 7px 10px; border-left: 4px solid var(--alm-h); margin-bottom: 6px;
+                  background: color-mix(in srgb, var(--alm-h) 12%, transparent); border-radius: 0 4px 4px 0; }
+  #alarmList li.hh { border-color: var(--alm-hh); background: color-mix(in srgb, var(--alm-hh) 14%, transparent); }
+  #alarmList li small { color: var(--muted); }
+  #alarmList li.none { border: none; background: none; color: var(--muted); padding-left: 0; }
+
+  /* Elemen SVG */
+  svg text { font-family: "Bahnschrift", "Barlow Semi Condensed", "DIN Alternate", "Segoe UI", Arial, sans-serif; }
+  .zone { fill: var(--zone); stroke: var(--zone-edge); stroke-width: 1; }
+  .zlabel { fill: var(--muted); font-size: 16px; font-weight: 600; }
+  .pipe { fill: none; stroke: var(--pipe); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
+  .flow { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 2 11; opacity: 0; }
+  .flow.on { opacity: 1; animation: run 0.9s linear infinite; }
+  .fl-oil { stroke: var(--oil); } .fl-water { stroke: var(--water); } .fl-emul { stroke: var(--emul); }
+  @keyframes run { to { stroke-dashoffset: -13; } }
+  .arrowhead { fill: var(--pipe); }
+  .junction { fill: var(--pipe); }
+  .shell { stroke: var(--equip); stroke-width: 2; }
+  .roof { fill: var(--roof); stroke: var(--equip); stroke-width: 2; stroke-linejoin: round; }
+  .part { fill: var(--roof); stroke: var(--equip); stroke-width: 1.5; }
+  .base { fill: var(--pipe); }
+  .tick { stroke: var(--equip); stroke-width: 1; opacity: 0.7; }
+  .surf { stroke: rgba(255,255,255,0.45); stroke-width: 1.5; }
+  .safe { stroke: var(--text2); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.8; }
+  .oos-veil { fill: var(--bg); opacity: 0.55; }
+  .oos-text { fill: var(--muted); font-size: 12px; font-weight: 600; }
+  .tname { fill: var(--text); font-size: 16px; font-weight: 600; }
+  .vbox { fill: var(--panel); stroke: var(--edge); stroke-width: 1; }
+  .vbox.h { stroke: var(--alm-h); stroke-width: 2; }
+  .vbox.hh { stroke: var(--alm-hh); stroke-width: 2; }
+  .vbig { fill: var(--text); font-size: 16px; font-weight: 600; }
+  .vpct { fill: var(--text2); font-size: 13px; }
+  .vsm { fill: var(--muted); font-size: 12.5px; }
+  .badge rect { fill: var(--alm-h); }
+  .badge.hh rect { fill: var(--alm-hh); }
+  .badge text { fill: #1A1A1A; font-size: 11px; font-weight: 700; }
+  .badge.hh text { fill: #fff; }
+  .lbl { fill: var(--text2); font-size: 13px; }
+  .lbl-b { fill: var(--text); font-size: 13px; font-weight: 600; }
+  .tag { fill: var(--muted); font-size: 12px; }
+  .valve .vbody { fill: var(--bg); stroke: var(--equip); stroke-width: 2; stroke-linejoin: round; }
+  .valve.open .vbody { fill: var(--on); stroke: var(--on); }
+  .valve.locked { opacity: 0.4; }
+  .pump .pbody { fill: var(--panel2); stroke: var(--equip); stroke-width: 2.5; }
+  .pump .ptri { fill: var(--equip); }
+  .pump .pring { fill: none; stroke: var(--oil); stroke-width: 2; stroke-dasharray: 5 6; opacity: 0;
+                 transform-box: fill-box; transform-origin: center; }
+  .pump.running .pbody { fill: var(--on); stroke: var(--on); }
+  .pump.running .ptri { fill: var(--on-ink); }
+  .pump.running .pring { opacity: 1; animation: spin 2.4s linear infinite; }
+  .pump .pbase { fill: var(--roof); stroke: var(--equip); stroke-width: 1.5; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .click { cursor: pointer; }
+  .click:focus { outline: none; }
+  .click:focus-visible { outline: 2px solid var(--ui); }
+  .click:hover .vbody, .click:hover .pbody { stroke: var(--ui); }
+  .legend-t { fill: var(--muted); font-size: 12px; }
+
+  @media (max-width: 1000px) { main, .bottom { grid-template-columns: 1fr; } .clockwrap { margin: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .flow.on, .pump.running .pring { animation: none; }
+    .flow.on { stroke-dasharray: none; opacity: 0.75; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <h1>Simulator Level Tangki</h1>
+    <p>Wash tank, product tank, storage tank dan loading tanker PJCO dan MCO</p>
+  </div>
+  <div class="clockwrap">
+    <div class="clock" id="clock">Hari 0, 00:00:00</div>
+    <span class="status" id="runStatus">Jeda</span>
+  </div>
+  <div class="controls">
+    <select id="speed" aria-label="Kecepatan simulasi">
+      <option value="1">1x waktu nyata</option>
+      <option value="10">10x</option>
+      <option value="60" selected>60x (1 menit/detik)</option>
+      <option value="600">600x</option>
+      <option value="3600">3600x (1 jam/detik)</option>
+    </select>
+    <button class="btn primary" id="btnRun" aria-pressed="false">Jalankan</button>
+    <button class="btn" id="btnReset">Reset</button>
+    <button class="btn" id="btnCsv">Unduh CSV</button>
+    <button class="btn" id="btnTheme">Tampilan terang</button>
+  </div>
+</header>
+
+<main>
+  <div class="stage">
+    <div class="viewbar">
+      <div class="seg" role="group" aria-label="Pilihan tampilan">
+        <button class="btn" id="v2d" aria-pressed="true">2D</button>
+        <button class="btn" id="v3d" aria-pressed="false">3D</button>
+      </div>
+      <span class="hint" id="hint3d" hidden>Seret untuk memutar, klik kanan atau Shift + seret untuk menggeser, gulir untuk zoom. Klik valve atau pompa untuk mengoperasikan.</span>
+      <button class="btn" id="camReset" hidden>Reset kamera</button>
+    </div>
+    <div class="hmi" id="hmi"></div>
+    <div class="hmi3d" id="hmi3d" hidden>
+      <canvas id="c3d"></canvas>
+      <div class="msg3d" id="msg3d" hidden></div>
+    </div>
+  </div>
+  <aside id="panel"></aside>
+</main>
+
+<section class="bottom">
+  <div class="card">
+    <div class="card-head">
+      <h2>Tren level</h2>
+      <button class="btn tab" data-tab="PJCO" aria-pressed="true">PJCO</button>
+      <button class="btn tab" data-tab="MCO" aria-pressed="false">MCO</button>
+    </div>
+    <canvas id="trend"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Alarm aktif</h2></div>
+    <ul id="alarmList"></ul>
+  </div>
+</section>
+
+<script>
+/* =====================================================================
+   KONFIGURASI  — ubah nilai di sini sesuai data lapangan.
+   Satuan: volume bbl, laju alir bbl/hari (BFPD/BOPD/BWPD), tinggi meter.
+   Tangki bisa diisi dengan:
+     od (mm) + height (m)  -> kapasitas dihitung dari geometri silinder, atau
+     cap (bbl) + height (m) -> kapasitas langsung
+   ===================================================================== */
+const CONFIG = {
+  alarm: { HH: 95, H: 90, L: 10, LL: 5 },       // batas alarm level (%)
+  pump: { name: "Pompa Transfer", rateM3h: 120 },  // satu pompa: product tank (baris 2) -> storage tank (baris 3), m3/jam
+  // Pompa loading ke tanker: suction dari semua storage tank (baris ke-3), kapasitas per pompa (m3/jam)
+  loading: { pumps: ["A", "B"], label: "Transfer Pump", rateM3h: 600 },
+  trains: {
+    PJCO: {
+      // Sumber fluida produksi yang masuk ke wash tank (gross BFPD & BS&W %, awal 0)
+      sources: [
+        { name: "SP1",      gross: 0, bsw: 0 },
+        { name: "SP2",      gross: 0, bsw: 0 },
+        { name: "SP4",      gross: 0, bsw: 0 },
+        { name: "SP Juata", gross: 0, bsw: 0 },
+        { name: "TOS",      gross: 0, bsw: 0 },
+      ],
+      wash: { name: "Wash Tank PJCO",
+              od: 11790,         // diameter luar (mm)
+              height: 7.35,      // tinggi shell (m) = level 100 %
+              overflowM: 7.00,   // ketinggian overflow (m)
+              capNominal: 4500,  // kapasitas nominal data tangki (bbl), informasi saja
+              alarm: { H: 97, HH: 99 },
+              drainMax: 5000,    // laju air keluar saat XV-Air bukaan 100 % (BWPD), linear
+              xvAirInit: 0, initTotal: 0, initWater: 0 },
+      // Dua product tank (storage tank PEP); overflow wash tank dibagi ke tangki yang XV-I terbuka.
+      // capWork = kapasitas data tangki (bbl) -> batas isi aman (alarm HH)
+      products: [
+        { name: "Tangki D", od: 11797, height: 7.362, capWork: 4500, init: 0, inOpen: true,  sucOpen: true },
+        { name: "Tangki E", od: 11790, height: 7.350, capWork: 4500, init: 0, inOpen: false, sucOpen: false },
+      ],
+      // Storage tank: od (mm), height = tinggi shell (m), capWork = kapasitas (bbl) dari data tangki.
+      // capWork dipakai sebagai batas isi aman (alarm HH); inService false = NOT USE (valve terkunci tutup).
+      storage: [
+        { name: "T7 PJCO", od: 31996, height: 14.085, capWork: 60000, inService: true,  init: 0, valveOpen: true },
+        { name: "T8 PJCO", od: 32022, height: 14.146, capWork: 60600, inService: false, init: 0, valveOpen: false },
+      ],
+    },
+    MCO: {
+      sources: [{ name: "MCO", gross: 0, bsw: 0 }],
+      wash: { name: "Wash Tank MCO", cap: 5000, height: 9.0, overflow: 85,
+              drainMax: 5000, xvAirInit: 0, initTotal: 0, initWater: 0 },
+      products: [
+        { name: "Tangki I", od: 11790, height: 7.350, capWork: 4500, init: 0, inOpen: true,  sucOpen: false },
+        { name: "Tangki J", od: 11790, height: 7.350, capWork: 4500, init: 0, inOpen: false, sucOpen: false },
+      ],
+      storage: [
+        { name: "T2 MCO",  od: 23506, height: 11.735, capWork: 29751, inService: false, init: 0, valveOpen: false },
+        { name: "T5 MCO",  od: 23530, height: 11.742, capWork: 30394, inService: true,  init: 0, valveOpen: true },
+        { name: "T10 MCO", od: 32257, height: 9.797,  capWork: 41120, inService: false, init: 0, valveOpen: false },
+      ],
+    },
+  },
+};
+
+
+/* ---------------- Tata letak HMI (koordinat SVG) ---------------- */
+const GEO = {
+  W: 100, H: 140, ROOF: 25, R1: 110, R2: 420, R3: 820,
+  IHY: 370,   // header inlet product tank
+  SUCY: 662,  // header suction pompa transfer
+  HY: 740,    // header discharge ke storage
+  LHY: 1085,  // header suction pompa loading
+  LDY: 1185,  // header discharge ke tanker
+  VH: 1240,   // tinggi kanvas
+  PJCO: { wcx: 310, inletX: 30, ovX: 480, prCx: [200, 400], stCx: [200, 420] },
+  MCO:  { wcx: 980, inletX: 640, ovX: 1180, prCx: [870, 1070], stCx: [760, 980, 1200] },
+  PUMP: { cx: 640, cy: 700, teeX: 600, disX: 700 },
+  LOAD: { A: { cx: 560, cy: 1140 }, B: { cx: 780, cy: 1140 }, tankerX: 960 },
+};
+const sid = s => s.replace(/[^A-Za-z0-9]+/g, "_");
+const $ = s => document.querySelector(s);
+const TANK_GEO = {};
+const KEYS = Object.keys(CONFIG.trains);
+
+/* ---------------- Pembuatan SVG ---------------- */
+// pipa dasar + lapisan aliran (titik bergerak berwarna fluida saat ada aliran)
+function pipe(pts, { arrow = false, flow = null, fluid = "oil" } = {}) {
+  const p = pts.map(q => q.join(",")).join(" ");
+  let s = `<polyline class="pipe" points="${p}"${arrow ? ' marker-end="url(#arrow)"' : ""}/>`;
+  if (flow) s += `<polyline class="flow fl-${fluid}" data-flow="${flow}" points="${p}"/>`;
+  return s;
+}
+function tankSVG(name, cx, top, opt = {}) {
+  const { W, H, ROOF } = GEO, x = cx - W / 2, t = sid(name);
+  TANK_GEO[t] = { innerY: top + 3, innerH: H - 6 };
+  const bw = 150, bh = 58, bx = cx - bw / 2, by = top + H + 32;
+  const iy = top + 3, ih = H - 6;
+  const ticks = [0, 25, 50, 75, 100].map(v => {
+    const y = (iy + ih * (1 - v / 100)).toFixed(1), len = v % 50 === 0 ? 9 : 5;
+    return `<line class="tick" x1="${x + 3}" y1="${y}" x2="${x + 3 + len}" y2="${y}"/>`;
+  }).join("");
+  const safeY = opt.workPct != null ? (iy + ih * (1 - opt.workPct / 100)).toFixed(1) : null;
+  return `<g id="${t}">
+    <rect class="shell" x="${x}" y="${top}" width="${W}" height="${H}" rx="2" fill="url(#gShell)"/>
+    ${opt.wash ? `<rect id="${t}_water" x="${x + 3}" y="${iy}" width="${W - 6}" height="0" fill="url(#gWater)"/>` : ""}
+    <rect id="${t}_oil" x="${x + 3}" y="${iy}" width="${W - 6}" height="0" fill="url(#gOil)"/>
+    <line id="${t}_surf" class="surf" x1="${x + 3}" x2="${x + W - 3}" y1="${iy + ih}" y2="${iy + ih}" visibility="hidden"/>
+    ${ticks}
+    ${safeY ? `<line class="safe" x1="${x + 2}" y1="${safeY}" x2="${x + W - 2}" y2="${safeY}"/>` : ""}
+    ${opt.oos ? `<rect class="oos-veil" x="${x}" y="${top}" width="${W}" height="${H}"/>
+      <text class="oos-text" x="${cx}" y="${top + H / 2 - 2}" text-anchor="middle">Tidak</text>
+      <text class="oos-text" x="${cx}" y="${top + H / 2 + 14}" text-anchor="middle">digunakan</text>` : ""}
+    <polygon class="roof" points="${x - 4},${top} ${cx},${top - ROOF} ${x + W + 4},${top}"/>
+    <rect class="part" x="${cx - 5}" y="${top - ROOF - 11}" width="10" height="12"/>
+    <rect class="part" x="${cx - 9}" y="${top - ROOF - 15}" width="18" height="5" rx="1"/>
+    <rect class="base" x="${x - 8}" y="${top + H}" width="${W + 16}" height="5" rx="1"/>
+    <text class="tname" x="${cx}" y="${top + H + 24}" text-anchor="middle">${name}</text>
+    <rect id="${t}_box" class="vbox" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="5"/>
+    <text id="${t}_v1" class="vbig" x="${bx + 10}" y="${by + 20}"></text>
+    <text id="${t}_v1b" class="vpct" x="${bx + bw - 10}" y="${by + 20}" text-anchor="end"></text>
+    <text id="${t}_v2" class="vsm" x="${bx + 10}" y="${by + 36}"></text>
+    <text id="${t}_v3" class="vsm" x="${bx + 10}" y="${by + 51}"></text>
+    <g id="${t}_badge" class="badge" visibility="hidden">
+      <rect x="${bx + bw - 36}" y="${by - 9}" width="32" height="17" rx="8.5"/>
+      <text id="${t}_badgeT" x="${bx + bw - 20}" y="${by + 3.5}" text-anchor="middle"></text>
+    </g>
+  </g>`;
+}
+function valveSVG(vid, cx, cy, label, data, { horizontal = false, aria = label, locked = false } = {}) {
+  const pts = horizontal
+    ? `${cx - 10},${cy - 8} ${cx - 10},${cy + 8} ${cx + 10},${cy - 8} ${cx + 10},${cy + 8}`
+    : `${cx - 8},${cy - 10} ${cx + 8},${cy - 10} ${cx - 8},${cy + 10} ${cx + 8},${cy + 10}`;
+  const lbl = horizontal
+    ? `<text class="tag" x="${cx}" y="${cy - 15}" text-anchor="middle">${label}</text>`
+    : `<text class="tag" x="${cx - 16}" y="${cy + 4}" text-anchor="end">${label}</text>`;
+  if (locked) return `<g id="${vid}" class="valve locked" aria-label="Valve ${aria}, terkunci tutup (tangki tidak digunakan)">
+      <polygon class="vbody" points="${pts}"/></g>${lbl}`;
+  return `<g id="${vid}" class="valve click" tabindex="0" role="button" data-valve="${data}" aria-label="Valve ${aria}">
+      <rect x="${cx - 16}" y="${cy - 14}" width="32" height="28" fill="transparent"/>
+      <polygon class="vbody" points="${pts}"/>
+    </g>${lbl}`;
+}
+function pumpIcon(id, cx, cy, aria) {
+  return `<g id="P_${id}" class="pump click" tabindex="0" role="button" data-pump="${id}" aria-label="${aria}, klik untuk start/stop">
+      <polygon class="pbase" points="${cx - 13},${cy + 25} ${cx + 13},${cy + 25} ${cx},${cy + 9}"/>
+      <circle class="pring" cx="${cx}" cy="${cy}" r="20"/>
+      <circle class="pbody" cx="${cx}" cy="${cy}" r="15"/>
+      <polygon class="ptri" points="${cx - 7},${cy - 8} ${cx - 7},${cy + 8} ${cx + 9},${cy}"/>
+    </g>`;
+}
+function trainSVG(k) {
+  const c = CONFIG.trains[k], g = GEO[k], { W, H, R1, R2, R3, HY, IHY, SUCY, LHY } = GEO;
+  const l = g.wcx - W / 2, r = g.wcx + W / 2;
+  let s = "";
+  // fluida produksi masuk (emulsi)
+  if (c.sources.length > 1) {
+    const mx = g.inletX + 172, ys = c.sources.map((_, i) => R1 - 40 + i * 32);
+    c.sources.forEach((src, i) => {
+      s += pipe([[g.inletX, ys[i]], [mx, ys[i]]], { flow: `${k}_src${i}`, fluid: "emul" });
+      s += `<text id="${k}_src${i}" class="lbl" x="${g.inletX}" y="${ys[i] - 6}">${src.name}</text>`;
+    });
+    s += pipe([[mx, ys[0]], [mx, ys[ys.length - 1]]], { flow: `${k}_mani`, fluid: "emul" });
+    s += pipe([[mx, R1 + 40], [l, R1 + 40]], { arrow: true, flow: `${k}_in`, fluid: "emul" });
+    s += `<text id="${k}_inQ" class="lbl-b" x="${g.inletX}" y="${ys[ys.length - 1] + 27}"></text>`;
+  } else {
+    s += pipe([[g.inletX, R1 + 40], [l, R1 + 40]], { arrow: true, flow: `${k}_in`, fluid: "emul" });
+    s += `<text class="lbl-b" x="${g.inletX}" y="${R1 + 31}">Fluida produksi ${k}</text>`;
+    s += `<text id="${k}_inQ" class="lbl" x="${g.inletX}" y="${R1 + 60}"></text>`;
+  }
+  // air keluar
+  s += pipe([[l, R1 + H - 12], [l - 35, R1 + H - 12], [l - 35, R1 + H + 80]], { arrow: true, flow: `${k}_wout`, fluid: "water" });
+  s += valveSVG(`XV_Air_${k}`, l - 35, R1 + H + 40, "XV-Air", `${k}:water`, { aria: `XV-Air ${k}, klik untuk mengatur bukaan` });
+  s += `<text id="${k}_xvTxt" class="lbl-b" x="${l - 51}" y="${R1 + H + 59}" text-anchor="end"></text>`;
+  s += `<text class="lbl" x="${l - 45}" y="${R1 + H + 79}" text-anchor="end">Air keluar</text>`;
+  s += `<text id="${k}_wQ" class="tag" x="${l - 45}" y="${R1 + H + 95}" text-anchor="end"></text>`;
+  // overflow -> header inlet -> product tank
+  const ibx = g.prCx.map(cx => cx - W / 2 - 20);
+  s += pipe([[r, R1 + 15], [g.ovX, R1 + 15], [g.ovX, IHY], [Math.min(...ibx), IHY]], { flow: `${k}_ov` });
+  s += `<text class="lbl" x="${g.ovX + 9}" y="${R1 + 160}">Overflow</text>`;
+  s += `<text class="lbl" x="${g.ovX + 9}" y="${R1 + 176}">minyak</text>`;
+  s += `<text id="${k}_ovQ" class="lbl-b" x="${g.ovX + 9}" y="${R1 + 194}"></text>`;
+  c.products.forEach((pt, j) => {
+    const cx = g.prCx[j], bx = ibx[j], sx = cx + W / 2 + 50;
+    s += pipe([[bx, IHY], [bx, R2 + 20], [cx - W / 2, R2 + 20]], { arrow: true, flow: `${k}_pin${j}` });
+    s += valveSVG(`XV_In_${sid(pt.name)}`, bx, IHY + 35, `XV-I${j + 1}`, `${k}:in${j}`, { aria: `inlet ${pt.name}` });
+    s += pipe([[cx + W / 2, R2 + H - 15], [sx, R2 + H - 15], [sx, SUCY]], { flow: `${k}_psuc${j}` });
+    s += valveSVG(`XV_Suc_${sid(pt.name)}`, cx + W / 2 + 25, R2 + H - 15, `XV-S${j + 1}`, `${k}:suc${j}`, { horizontal: true, aria: `suction ${pt.name}` });
+    s += tankSVG(pt.name, cx, R2, { workPct: pt.workPct });
+  });
+  s += tankSVG(c.wash.name, g.wcx, R1, { wash: true });
+  // storage
+  c.storage.forEach((st, i) => {
+    const cx = g.stCx[i], bx = cx - W / 2 - 20, locked = st.inService === false;
+    s += pipe([[bx, HY], [bx, R3 + 20], [cx - W / 2, R3 + 20]], { arrow: true, flow: `${k}_sin${i}` });
+    s += valveSVG(`XV_${sid(st.name)}`, bx, HY + 40, `XV-${st.name.split(" ")[0]}`, `${k}:${i}`, { aria: `inlet ${st.name}`, locked });
+    const oy = R3 + H - 15, ox = cx + W / 2 + 40;
+    s += pipe([[cx + W / 2, oy], [ox, oy], [ox, LHY]], { flow: `${k}_sout${i}` });
+    s += valveSVG(`XV_Out_${sid(st.name)}`, cx + W / 2 + 20, oy, "XV-O", `${k}:out${i}`, { horizontal: true, aria: `outlet ${st.name}`, locked });
+    s += tankSVG(st.name, cx, R3, { oos: locked, workPct: st.workPct });
+  });
+  return s;
+}
+function pumpAreaSVG() {
+  const PU = GEO.PUMP, { W, HY, SUCY } = GEO;
+  const sx = [], bx = [];
+  for (const k of KEYS) {
+    GEO[k].prCx.forEach(cx => sx.push(cx + W / 2 + 50));
+    GEO[k].stCx.forEach(cx => bx.push(cx - W / 2 - 20));
+  }
+  let s = pipe([[Math.min(...sx), SUCY], [Math.max(...sx), SUCY]], { flow: "tr_suc" });
+  s += pipe([[PU.teeX, SUCY], [PU.teeX, PU.cy], [PU.cx - 15, PU.cy]], { arrow: true, flow: "tr_suc" });
+  s += pipe([[PU.cx, PU.cy - 15], [PU.disX, PU.cy - 15], [PU.disX, HY]], { flow: "tr_dis" });
+  s += pipe([[Math.min(...bx), HY], [Math.max(...bx), HY]], { flow: "tr_dis" });
+  s += `<circle class="junction" cx="${PU.teeX}" cy="${SUCY}" r="4.5"/><circle class="junction" cx="${PU.disX}" cy="${HY}" r="4.5"/>`;
+  s += pumpIcon("TR", PU.cx, PU.cy, CONFIG.pump.name);
+  s += `<text class="lbl-b" x="${PU.teeX - 12}" y="${PU.cy - 2}" text-anchor="end">${CONFIG.pump.name}</text>`;
+  s += `<text id="P_TR_q" class="lbl" x="${PU.teeX - 12}" y="${PU.cy + 15}" text-anchor="end"></text>`;
+  return s;
+}
+function loadingSVG() {
+  const { W, LHY, LDY, LOAD } = GEO, L = CONFIG.loading;
+  const ox = [];
+  for (const k of KEYS) GEO[k].stCx.forEach(cx => ox.push(cx + W / 2 + 40));
+  let s = pipe([[Math.min(...ox), LHY], [Math.max(...ox), LHY]], { flow: "ld_hdr" });
+  L.pumps.forEach(id => {
+    const p = LOAD[id], dx = p.cx + 50;
+    s += `<circle class="junction" cx="${p.cx - 20}" cy="${LHY}" r="4.5"/>`;
+    s += pipe([[p.cx - 20, LHY], [p.cx - 20, p.cy], [p.cx - 15, p.cy]], { arrow: true, flow: `ld_${id}` });
+    s += pipe([[p.cx, p.cy - 15], [dx, p.cy - 15], [dx, LDY]], { flow: `ld_${id}` });
+    s += pumpIcon(`L${id}`, p.cx, p.cy, `${L.label} ${id}`);
+    s += `<text class="lbl-b" x="${p.cx - 32}" y="${p.cy + 1}" text-anchor="end">${L.label} ${id}</text>`;
+    s += `<text id="P_L${id}_q" class="lbl" x="${p.cx - 32}" y="${p.cy + 18}" text-anchor="end"></text>`;
+  });
+  const tx = LOAD.tankerX, first = LOAD[L.pumps[0]].cx + 50, hy = LDY - 32;
+  s += pipe([[first, LDY], [tx + 8, LDY]], { arrow: true, flow: "ld_tanker" });
+  s += `<g id="tanker">
+    <path class="roof" d="M${tx} ${hy} H${tx + 300} L${tx + 278} ${hy + 56} H${tx + 26} Z"/>
+    <line class="tick" x1="${tx + 14}" y1="${hy + 30}" x2="${tx + 288}" y2="${hy + 30}"/>
+    <rect class="part" x="${tx + 228}" y="${hy - 30}" width="46" height="30" rx="2"/>
+    <rect class="part" x="${tx + 244}" y="${hy - 42}" width="12" height="12"/>
+    <text class="tname" x="${tx + 112}" y="${hy + 22}" text-anchor="middle">Tanker</text>
+    <text id="tanker_v1" class="lbl" x="${tx + 140}" y="${hy + 48}" text-anchor="middle"></text>
+    <text id="tanker_v2" class="lbl-b" x="${tx + 110}" y="${hy - 10}" text-anchor="middle"></text>
+  </g>`;
+  return s;
+}
+function legendSVG(x, y) {
+  const item = (dx, cls, label) => `<line class="flow on fl-${cls}" x1="${x + dx}" y1="${y}" x2="${x + dx + 26}" y2="${y}" style="opacity:1"/>
+    <text class="legend-t" x="${x + dx + 32}" y="${y + 4}">${label}</text>`;
+  return item(0, "emul", "Emulsi") + item(90, "oil", "Minyak") + item(180, "water", "Air");
+}
+function buildSVG() {
+  const VH = GEO.VH;
+  $("#hmi").innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 ${VH}" role="img" aria-label="Diagram HMI tangki PJCO dan MCO">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker>
+      <linearGradient id="gShell" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" style="stop-color:var(--shell-b)"/><stop offset="0.35" style="stop-color:var(--shell-a)"/><stop offset="1" style="stop-color:var(--shell-b)"/>
+      </linearGradient>
+      <linearGradient id="gOil" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" style="stop-color:var(--oil)"/><stop offset="1" style="stop-color:var(--oil-2)"/>
+      </linearGradient>
+      <linearGradient id="gWater" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" style="stop-color:var(--water)"/><stop offset="1" style="stop-color:var(--water-2)"/>
+      </linearGradient>
+    </defs>
+    <rect class="zone" x="10" y="12" width="572" height="${GEO.LHY - 30}" rx="10"/>
+    <rect class="zone" x="592" y="12" width="718" height="${GEO.LHY - 30}" rx="10"/>
+    <rect class="zone" x="10" y="${GEO.LHY - 8}" width="1300" height="${VH - GEO.LHY - 2}" rx="10"/>
+    <text class="zlabel" x="28" y="38">PJCO</text>
+    <text class="zlabel" x="610" y="38">MCO</text>
+    <text class="zlabel" x="28" y="${GEO.LHY + 22}">Loading tanker</text>
+    ${legendSVG(1050, 34)}
+    ${KEYS.map(trainSVG).join("")}
+    ${pumpAreaSVG()}
+    ${loadingSVG()}
+  </svg>`;
+}
+
+/* ---------------- Panel kontrol ---------------- */
+function buildPanel() {
+  let h = "";
+  for (const k of KEYS) {
+    const c = CONFIG.trains[k];
+    h += `<section>
+      <h2>Produksi ${k}</h2>
+      <div class="src-grid">
+        <span class="hd">Sumber</span><span class="hd">Gross (BFPD)</span><span class="hd">BS&amp;W (%)</span>
+        ${c.sources.map((src, i) => `
+          <span>${src.name}</span>
+          <input type="number" min="0" step="50" id="${k}_g${i}" aria-label="Gross ${src.name} (BFPD)">
+          <input type="number" min="0" max="100" step="0.5" id="${k}_b${i}" aria-label="BS&amp;W ${src.name} (%)">`).join("")}
+      </div>
+      <div class="derived" id="${k}_derived"></div>
+      <label class="row">Bukaan XV-Air (%)<input type="number" min="0" max="100" step="1" id="${k}_xv"></label>
+      <input type="range" min="0" max="100" step="1" id="${k}_xvr" aria-label="Bukaan XV-Air ${k} (%)">
+      <div class="derived">Bukaan 100 % mengeluarkan ${num(c.wash.drainMax)} BWPD air</div>
+    </section>`;
+  }
+  h += `<section>
+      <h2>${CONFIG.pump.name}</h2>
+      <label class="row">Kapasitas (m³/jam)<input type="number" min="0" step="5" id="pumpRate"></label>
+      <button class="btn wide" id="pumpBtn" aria-pressed="false">Start ${CONFIG.pump.name}</button>
+      <div class="info" id="pumpInfo"></div>
+    </section>
+    <section>
+      <h2>Loading tanker</h2>
+      <label class="row">Kapasitas per pompa (m³/jam)<input type="number" min="0" step="10" id="loadRate"></label>
+      ${CONFIG.loading.pumps.map(id => `<button class="btn wide" id="loadBtn${id}" aria-pressed="false">Start ${CONFIG.loading.label} ${id}</button>`).join("")}
+      <div class="info" id="loadInfo"></div>
+      <button class="btn wide" id="tankerReset">Nol-kan volume tanker</button>
+    </section>
+    <details>
+      <summary>Cara mengoperasikan</summary>
+      <p>Klik valve di diagram untuk membuka atau menutupnya; valve terisi berarti terbuka. XV-Air diatur dengan bukaan % di panel ini.</p>
+      <p>XV-I memilih product tank yang menerima overflow wash tank, XV-S memilih product tank yang dipompa, dan XV-O memilih storage tank yang di-loading ke tanker.</p>
+      <p>Titik bergerak di pipa menunjukkan aliran: kuning zaitun untuk emulsi, oranye untuk minyak, biru untuk air. Garis putus-putus di tangki adalah batas isi aman sesuai kapasitas data tangki.</p>
+      <p>Tangki bertanda "Tidak digunakan" memiliki valve yang terkunci tutup.</p>
+    </details>`;
+  $("#panel").innerHTML = h;
+}
+
+/* ---------------- State & model ---------------- */
+const BBL_PER_M3 = 6.28981;
+function prepareConfig() {
+  for (const c of Object.values(CONFIG.trains)) {
+    for (const t of [c.wash, ...c.products, ...c.storage]) {
+      if (t.od) { t.area = Math.PI / 4 * (t.od / 1000) ** 2; t.cap = t.area * BBL_PER_M3 * t.height; }
+    }
+    if (c.wash.overflowM) c.wash.overflow = c.wash.overflowM / c.wash.height * 100;
+    // storage: kapasitas data (capWork) = batas isi aman -> level aman (m), alarm H 95 % & HH 100 % dari capWork
+    for (const t of [...c.products, ...c.storage]) {
+      if (t.capWork && t.area) {
+        t.workM = t.capWork / BBL_PER_M3 / t.area;
+        t.workPct = t.workM / t.height * 100;
+        t.alarm = { HH: t.workPct, H: t.workPct * 0.95 };
+      }
+    }
+  }
+}
+function feed(k) {
+  const src = P[k].sources;
+  const gross = src.reduce((a, x) => a + x.gross, 0), water = src.reduce((a, x) => a + x.gross * x.bsw / 100, 0);
+  return { gross, water, oil: gross - water, bsw: gross ? water / gross * 100 : 0 };
+}
+let pumpRate = 0, loadRateM3h = 0;
+let S, P, history, running = false, lastRec = 0, trendTab = "PJCO", alarmSeen = {};
+function initState() {
+  S = { t: 0, trains: {} };
+  P = {};
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    S.trains[k] = {
+      wash: { Vw: c.wash.cap * c.wash.initWater / 100,
+              Vo: c.wash.cap * (c.wash.initTotal - c.wash.initWater) / 100, rate: 0 },
+      products: c.products.map(p => ({ V: p.cap * p.init / 100, inOpen: p.inOpen, sucOpen: p.sucOpen,
+                                       rate: 0, qin: 0, qout: 0, full: false })),
+      storage: c.storage.map(s => ({ V: s.cap * s.init / 100, open: s.valveOpen && s.inService !== false,
+                                     outOpen: false, rate: 0, qout: 0, full: false })),
+      q: { wout: 0, oilOut: 0, ov: 0 }, flags: {},
+    };
+    P[k] = { sources: c.sources.map(x => ({ gross: x.gross, bsw: x.bsw })), xv: c.wash.xvAirInit };
+  }
+  S.pump = { on: false, trip: false, msg: "", q: 0, flags: {} };
+  S.load = { pumps: Object.fromEntries(CONFIG.loading.pumps.map(id => [id, { on: false, trip: false }])),
+             q: 0, loaded: 0, msg: "", flags: {} };
+  loadRateM3h = CONFIG.loading.rateM3h;
+  pumpRate = CONFIG.pump.rateM3h;
+  history = []; lastRec = -Infinity; alarmSeen = {};
+}
+const pct = (V, cap) => V / cap * 100;
+function smooth(old, inst, dt) { const a = 1 - Math.exp(-dt / 300); return old + a * (inst - old); }
+
+function stepTrain(k, dt) {
+  const c = CONFIG.trains[k], st = S.trains[k], p = P[k], d = dt / 86400;
+  const w = st.wash, Wc = c.wash;
+  const flags = { carry: false, oilLoss: false, ovBlocked: false, washSpill: false };
+
+  // 1) fluida produksi masuk ke wash tank
+  const f = feed(k);
+  w.Vw += f.water * d; w.Vo += f.oil * d;
+
+  // 2) buang air: laju = bukaan XV-Air (%) x drainMax; jika air habis, minyak yang terbuang
+  let wout = 0, oilOut = 0;
+  const need = p.xv / 100 * Wc.drainMax * d;
+  if (need > 0) {
+    wout = Math.min(need, w.Vw); w.Vw -= wout;
+    oilOut = Math.min(need - wout, w.Vo); w.Vo -= oilOut;
+    if (oilOut > 1e-9) flags.oilLoss = true;
+  }
+
+  // 3) overflow ke product tank yang XV-Inlet terbuka (dibagi rata)
+  const Vov = Wc.cap * Wc.overflow / 100;
+  const openIn = st.products.filter(x => x.inOpen);
+  st.products.forEach(x => { x.qin = 0; x.qout = 0; });
+  let ov = 0;
+  if (w.Vw + w.Vo > Vov) {
+    if (openIn.length) {
+      let ex = w.Vw + w.Vo - Vov; ov = ex;
+      const fo = Math.min(ex, w.Vo); w.Vo -= fo; ex -= fo;
+      if (ex > 1e-9) { w.Vw -= ex; flags.carry = true; }
+      openIn.forEach(x => { x.V += ov / openIn.length; x.qin = ov / openIn.length / d; });
+    } else flags.ovBlocked = true;
+  }
+  // wash tank meluap jika melebihi 100 %
+  if (w.Vw + w.Vo > Wc.cap) {
+    let ex = w.Vw + w.Vo - Wc.cap; const fo = Math.min(ex, w.Vo); w.Vo -= fo; w.Vw -= ex - fo;
+    flags.washSpill = true;
+  }
+  st.q = { wout: wout / d, oilOut: oilOut / d, ov: ov / d };
+  st.flags = flags;
+}
+
+// Pompa transfer: suction dari product tank (XV-S buka), discharge ke storage (valve inlet buka)
+function stepPump(d) {
+  const A = CONFIG.alarm, pm = S.pump;
+  pm.q = 0; pm.flags = { deadhead: false, noSuction: false };
+  if (!pm.on) return;
+  const suc = [];
+  KEYS.forEach(k => S.trains[k].products.forEach((x, j) => {
+    if (x.sucOpen) suc.push({ x, a: Math.max(0, x.V - CONFIG.trains[k].products[j].cap * A.LL / 100) });
+  }));
+  if (!suc.length) { pm.flags.noSuction = true; return; }
+  let pool = suc.filter(o => o.a > 1e-9);
+  if (!pool.length) { pm.on = false; pm.trip = true; return; }
+  const dests = [];
+  KEYS.forEach(k => S.trains[k].storage.forEach(s => { if (s.open) dests.push(s); }));
+  if (!dests.length) { pm.flags.deadhead = true; return; }
+  let need = pumpRate * M3H_TO_BPD * d, total = 0;
+  while (need > 1e-9 && pool.length) {
+    const share = need / pool.length, next = [];
+    for (const o of pool) {
+      const take = Math.min(share, o.a);
+      o.a -= take; need -= take; total += take;
+      o.x.V -= take; o.x.qout += take / d;
+      if (o.a > 1e-9) next.push(o);
+    }
+    pool = next;
+  }
+  dests.forEach(s => { s.V += total / dests.length; });
+  pm.q = total / d;
+}
+// Loading tanker: Transfer Pump A/B paralel, suction dari storage tank yang XV-O terbuka
+const M3H_TO_BPD = 24 * BBL_PER_M3;
+function loadSources() {
+  const LL = CONFIG.alarm.LL, out = [];
+  KEYS.forEach(k => S.trains[k].storage.forEach((s, i) => {
+    const sc = CONFIG.trains[k].storage[i];
+    if (s.outOpen && sc.inService !== false) out.push({ s, a: Math.max(0, s.V - sc.cap * LL / 100) });
+  }));
+  return out;
+}
+function stepLoading(d) {
+  const L = S.load; L.q = 0; L.flags = { noSuction: false };
+  KEYS.forEach(k => S.trains[k].storage.forEach(s => { s.qout = 0; }));
+  const running = Object.values(L.pumps).filter(p => p.on);
+  if (!running.length) return;
+  const src = loadSources();
+  if (!src.length) { L.flags.noSuction = true; return; }
+  let pool = src.filter(o => o.a > 1e-9);
+  if (!pool.length) { running.forEach(p => { p.on = false; p.trip = true; }); return; }
+  let need = running.length * loadRateM3h * M3H_TO_BPD * d, total = 0;
+  while (need > 1e-9 && pool.length) {
+    const share = need / pool.length, next = [];
+    for (const o of pool) {
+      const take = Math.min(share, o.a);
+      o.a -= take; need -= take; total += take; o.s.V -= take; o.s.qout += take / d;
+      if (o.a > 1e-9) next.push(o);
+    }
+    pool = next;
+  }
+  L.q = total / d; L.loaded += total;
+}
+function heightsM() {
+  const o = {};
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k];
+    o[c.wash.name] = (st.wash.Vw + st.wash.Vo) / c.wash.cap * c.wash.height;
+    st.products.forEach((x, j) => { o[c.products[j].name] = x.V / c.products[j].cap * c.products[j].height; });
+    st.storage.forEach((s, i) => { o[c.storage[i].name] = s.V / c.storage[i].cap * c.storage[i].height; });
+  }
+  return o;
+}
+function step(dt) {
+  if (S.pump.msg && !S.pump.on && !pumpPermissive()) S.pump.msg = "";
+  const h0 = heightsM();
+  for (const k of KEYS) stepTrain(k, dt);
+  stepPump(dt / 86400);
+  stepLoading(dt / 86400);
+  if (S.load.msg && !loadPermissive()) S.load.msg = "";
+  // tangki meluap: batasi di 100 %
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k];
+    st.products.forEach((x, j) => { x.full = x.V > c.products[j].cap; if (x.full) x.V = c.products[j].cap; });
+    st.storage.forEach((s, i) => { s.full = s.V > c.storage[i].cap; if (s.full) s.V = c.storage[i].cap; });
+  }
+  // laju kenaikan level (cm/jam), dihaluskan
+  const h1 = heightsM(), hr = dt / 3600, R = n => (h1[n] - h0[n]) * 100 / hr;
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k];
+    st.wash.rate = smooth(st.wash.rate, R(c.wash.name), dt);
+    st.products.forEach((x, j) => { x.rate = smooth(x.rate, R(c.products[j].name), dt); });
+    st.storage.forEach((s, i) => { s.rate = smooth(s.rate, R(c.storage[i].name), dt); });
+  }
+  S.t += dt;
+  if (S.t - lastRec >= 60) { record(); lastRec = S.t; }
+}
+
+/* ---------------- Riwayat & CSV ---------------- */
+function record() {
+  const h = { t: S.t, pumpQ: S.pump.q, loadQ: S.load.q, loaded: S.load.loaded };
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k], f = feed(k);
+    h[k] = { wash: pct(st.wash.Vw + st.wash.Vo, c.wash.cap), washW: pct(st.wash.Vw, c.wash.cap),
+             prod: st.products.map((x, j) => pct(x.V, c.products[j].cap)),
+             st: st.storage.map((s, i) => pct(s.V, c.storage[i].cap)),
+             gross: f.gross, bsw: f.bsw, xv: P[k].xv, src: P[k].sources.map(x => x.gross), ...st.q };
+  }
+  history.push(h);
+  if (history.length > 4000) history = history.filter((_, i) => i % 2 === 0);
+}
+function exportCSV() {
+  if (!history.length) { alert("Belum ada data. Jalankan simulasi terlebih dahulu."); return; }
+  const cols = ["waktu_jam"];
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    if (c.sources.length > 1) cols.push(...c.sources.map(x => `${k}_${sid(x.name)}_gross_bfpd`));
+    cols.push(`${k}_gross_bfpd`, `${k}_bsw_pct`, `${sid(c.wash.name)}_total_pct`, `${sid(c.wash.name)}_air_pct`,
+              `${k}_bukaan_xv_air_pct`, `${k}_air_keluar_bwpd`, `${k}_minyak_terbuang_bopd`, `${k}_overflow_bopd`,
+              ...c.products.map(x => `${sid(x.name)}_pct`), ...c.storage.map(s => `${sid(s.name)}_pct`));
+  }
+  cols.push("pompa_transfer_bopd", "loading_tanker_bopd", "loading_tanker_m3_jam", "volume_tanker_bbl");
+  const rows = history.map(h => {
+    const r = [(h.t / 3600).toFixed(3)];
+    for (const k of KEYS) {
+      const x = h[k];
+      if (x.src.length > 1) r.push(...x.src);
+      r.push(x.gross, x.bsw.toFixed(2), x.wash.toFixed(2), x.washW.toFixed(2), x.xv, x.wout.toFixed(0),
+             x.oilOut.toFixed(0), x.ov.toFixed(0), ...x.prod.map(v => v.toFixed(2)), ...x.st.map(v => v.toFixed(2)));
+    }
+    r.push(h.pumpQ.toFixed(0), h.loadQ.toFixed(0), (h.loadQ / M3H_TO_BPD).toFixed(1), h.loaded.toFixed(0));
+    return r.join(",");
+  });
+  const blob = new Blob([cols.join(",") + "\n" + rows.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "data_level_tangki.csv"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- Alarm ---------------- */
+function levelAlarm(list, name, p, lowActive = false, A = CONFIG.alarm) {
+  if (p >= A.HH) list.push({ id: name + "HH", pr: "hh", tag: "HH", tank: name, msg: `${name} level High-High ${p.toFixed(1)} %` });
+  else if (p >= A.H) list.push({ id: name + "H", pr: "h", tag: "H", tank: name, msg: `${name} level High ${p.toFixed(1)} %` });
+  else if (lowActive && p <= A.LL) list.push({ id: name + "LL", pr: "hh", tag: "LL", tank: name, msg: `${name} level Low-Low ${p.toFixed(1)} %` });
+  else if (lowActive && p <= A.L) list.push({ id: name + "L", pr: "h", tag: "L", tank: name, msg: `${name} level Low ${p.toFixed(1)} %` });
+}
+function collectAlarms() {
+  const list = [];
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k], wn = c.wash.name;
+    levelAlarm(list, wn, pct(st.wash.Vw + st.wash.Vo, c.wash.cap), false, { ...CONFIG.alarm, ...(c.wash.alarm || {}) });
+    const wp = pct(st.wash.Vw, c.wash.cap);
+    if (st.flags.washSpill) list.push({ id: k + "wsp", pr: "hh", tag: "OF", tank: wn, msg: `${wn} penuh dan meluap` });
+    if (st.flags.ovBlocked) list.push({ id: k + "ovb", pr: "hh", msg: `${wn}: overflow tertahan, semua XV-Inlet product tank ${k} tertutup` });
+    if (st.flags.carry) list.push({ id: k + "carry", pr: "hh", tag: "WC", tank: wn, msg: `${wn}: air terbawa overflow ke product tank` });
+    else if (st.flags.oilLoss) list.push({ id: k + "oil", pr: "hh", tag: "OL", tank: wn, msg: `${wn}: lapisan air habis, minyak terbuang lewat XV-Air` });
+    else if (wp >= c.wash.overflow - 10) list.push({ id: k + "ifc", pr: "h", tag: "IF", tank: wn, msg: `${wn}: interface air tinggi ${wp.toFixed(1)} %` });
+    st.products.forEach((x, j) => {
+      const n = c.products[j].name;
+      levelAlarm(list, n, pct(x.V, c.products[j].cap), S.pump.on && x.sucOpen, { ...CONFIG.alarm, ...(c.products[j].alarm || {}) });
+      if (x.full) list.push({ id: n + "of", pr: "hh", tag: "OF", tank: n, msg: `${n} penuh dan meluap` });
+    });
+    st.storage.forEach((s, i) => {
+      const n = c.storage[i].name;
+      const anyLoad = Object.values(S.load.pumps).some(p => p.on);
+      levelAlarm(list, n, pct(s.V, c.storage[i].cap), anyLoad && s.outOpen, { ...CONFIG.alarm, ...(c.storage[i].alarm || {}) });
+      if (s.full) list.push({ id: n + "of", pr: "hh", tag: "OF", tank: n, msg: `${n} penuh dan meluap` });
+    });
+  }
+  const pn = CONFIG.pump.name, pm = S.pump;
+  if (pm.trip) list.push({ id: "ptrip", pr: "hh", msg: `${pn} trip: product tank yang XV-S terbuka sudah Low-Low` });
+  if (pm.flags.noSuction) list.push({ id: "pnosuc", pr: "hh", msg: `${pn} jalan dengan semua XV-S tertutup` });
+  const LB = CONFIG.loading.label;
+  Object.entries(S.load.pumps).forEach(([id, p]) => {
+    if (p.trip) list.push({ id: "ltrip" + id, pr: "hh", msg: `${LB} ${id} trip: storage tank yang XV-O terbuka sudah Low-Low` });
+  });
+  if (S.load.flags.noSuction) list.push({ id: "lnosuc", pr: "hh", msg: `${LB} jalan dengan semua XV-O storage tertutup` });
+  if (pm.flags.deadhead) list.push({ id: "pdead", pr: "h", msg: `${pn} jalan tanpa jalur alir (semua valve inlet storage tertutup)` });
+  const ids = new Set(list.map(a => a.id));
+  for (const id of Object.keys(alarmSeen)) if (!ids.has(id)) delete alarmSeen[id];
+  list.forEach(a => { if (!(a.id in alarmSeen)) alarmSeen[a.id] = S.t; a.since = alarmSeen[a.id]; });
+  list.sort((a, b) => (a.pr === b.pr ? a.since - b.since : a.pr === "hh" ? -1 : 1));
+  return list;
+}
+
+
+/* ---------------- Render ---------------- */
+function fmtTime(t) {
+  const d = Math.floor(t / 86400), r = t % 86400;
+  const hh = String(Math.floor(r / 3600)).padStart(2, "0"), mm = String(Math.floor(r % 3600 / 60)).padStart(2, "0"),
+        ss = String(Math.floor(r % 60)).padStart(2, "0");
+  return `Hari ${d}, ${hh}:${mm}:${ss}`;
+}
+const num = (v, d = 0) => v.toLocaleString("id-ID", { minimumFractionDigits: d, maximumFractionDigits: d });
+const rateTxt = r => Math.abs(r) < 0.05 ? "Level stabil" : `${r > 0 ? "Naik" : "Turun"} ${num(Math.abs(r), 1)} cm/jam`;
+function setText(id, txt) { const e = document.getElementById(id); if (e && e.textContent !== txt) e.textContent = txt; }
+function setValve(data, open) { const e = document.querySelector(`[data-valve="${data}"]`); if (e) e.classList.toggle("open", !!open); }
+function setPump(id, on) { const e = document.getElementById(`P_${id}`); if (e) e.classList.toggle("running", !!on); }
+function setLevel(t, part, fromPct, toPct) {
+  const g = TANK_GEO[t], e = document.getElementById(`${t}_${part}`);
+  const y1 = g.innerY + g.innerH * (1 - Math.min(100, toPct) / 100), y2 = g.innerY + g.innerH * (1 - fromPct / 100);
+  e.setAttribute("y", y1.toFixed(1)); e.setAttribute("height", Math.max(0, y2 - y1).toFixed(1));
+}
+function setSurface(t, p) {
+  const g = TANK_GEO[t], e = document.getElementById(`${t}_surf`);
+  const y = (g.innerY + g.innerH * (1 - Math.min(100, p) / 100)).toFixed(1);
+  e.setAttribute("y1", y); e.setAttribute("y2", y); e.setAttribute("visibility", p > 0.3 ? "visible" : "hidden");
+}
+function showTank(name, p, height, l2, l3) {
+  const t = sid(name);
+  setText(`${t}_v1`, `${num(p / 100 * height, 2)} m`);
+  setText(`${t}_v1b`, `${num(p, 1)} %`);
+  setText(`${t}_v2`, l2); setText(`${t}_v3`, l3);
+  setSurface(t, p);
+}
+function flowState() {
+  const F = {}, pm = S.pump, LS = S.load;
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k], p = P[k], f = feed(k);
+    c.sources.forEach((_, i) => { F[`${k}_src${i}`] = p.sources[i].gross > 0; });
+    F[`${k}_mani`] = F[`${k}_in`] = f.gross > 0;
+    F[`${k}_wout`] = st.q.wout + st.q.oilOut > 0;
+    F[`${k}_ov`] = st.q.ov > 0;
+    st.products.forEach((x, j) => { F[`${k}_pin${j}`] = x.qin > 0; F[`${k}_psuc${j}`] = x.qout > 0; });
+    st.storage.forEach((s, i) => { F[`${k}_sin${i}`] = s.open && pm.q > 0; F[`${k}_sout${i}`] = s.qout > 0; });
+  }
+  F.tr_suc = F.tr_dis = pm.q > 0;
+  F.ld_hdr = F.ld_tanker = LS.q > 0;
+  CONFIG.loading.pumps.forEach(id => { F[`ld_${id}`] = LS.pumps[id].on && LS.q > 0; });
+  return F;
+}
+function render(alarms) {
+  $("#clock").textContent = fmtTime(S.t);
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k], p = P[k], f = feed(k);
+    const wt = sid(c.wash.name), wTot = pct(st.wash.Vw + st.wash.Vo, c.wash.cap), wW = pct(st.wash.Vw, c.wash.cap);
+    setLevel(wt, "water", 0, wW); setLevel(wt, "oil", wW, wTot);
+    showTank(c.wash.name, wTot, c.wash.height, `Interface air ${num(wW, 1)} %`, rateTxt(st.wash.rate));
+    st.products.forEach((x, j) => {
+      const pc = c.products[j], pp = pct(x.V, pc.cap);
+      setLevel(sid(pc.name), "oil", 0, pp);
+      showTank(pc.name, pp, pc.height, rateTxt(x.rate), `${num(x.V)} / ${num(pc.capWork || pc.cap)} bbl`);
+      setValve(`${k}:in${j}`, x.inOpen); setValve(`${k}:suc${j}`, x.sucOpen);
+    });
+    st.storage.forEach((s, i) => {
+      const sc = c.storage[i], sp = pct(s.V, sc.cap);
+      setLevel(sid(sc.name), "oil", 0, sp);
+      showTank(sc.name, sp, sc.height, sc.inService === false ? "Tidak digunakan" : rateTxt(s.rate),
+               `${num(s.V)} / ${num(sc.capWork || sc.cap)} bbl`);
+      setValve(`${k}:${i}`, s.open); setValve(`${k}:out${i}`, s.outOpen);
+    });
+    setValve(`${k}:water`, p.xv > 0);
+    setText(`${k}_xvTxt`, `${num(p.xv)} %`);
+    if (c.sources.length > 1) {
+      c.sources.forEach((src, i) => setText(`${k}_src${i}`, `${src.name}   ${num(p.sources[i].gross)} BFPD, ${num(p.sources[i].bsw, 1)} %`));
+      setText(`${k}_inQ`, `Total ${num(f.gross)} BFPD, BS&W ${num(f.bsw, 1)} %`);
+    } else setText(`${k}_inQ`, `Gross ${num(f.gross)} BFPD, BS&W ${num(f.bsw, 1)} %`);
+    setText(`${k}_wQ`, st.q.oilOut > 0 ? `${num(st.q.wout)} BWPD + minyak ${num(st.q.oilOut)} BOPD` : `${num(st.q.wout)} BWPD`);
+    setText(`${k}_ovQ`, st.flags.ovBlocked ? "Tertahan" : `${num(st.q.ov)} BOPD`);
+    setText(`${k}_derived`, `Total ${num(f.gross)} BFPD, BS&W ${num(f.bsw, 1)} %. Minyak ${num(f.oil)} BOPD, air ${num(f.water)} BWPD.`);
+  }
+  // pompa transfer
+  const pm = S.pump;
+  setPump("TR", pm.on);
+  setText("P_TR_q", `${num(pm.q / M3H_TO_BPD)} m³/jam`);
+  const btn = $("#pumpBtn");
+  btn.textContent = `${pm.on ? "Stop" : "Start"} ${CONFIG.pump.name}`;
+  btn.setAttribute("aria-pressed", pm.on);
+  const parts = [];
+  KEYS.forEach(k => S.trains[k].products.forEach((x, j) => { if (x.sucOpen) parts.push(`${CONFIG.trains[k].products[j].name} ${num(x.qout / M3H_TO_BPD)} m³/jam`); }));
+  let info = `Laju ${num(pm.q / M3H_TO_BPD)} m³/jam (${num(pm.q)} BOPD)\nSuction: ` + (parts.length ? parts.join(", ") : "semua XV-S tertutup");
+  if (pm.trip) info += "\nPompa trip karena product tank sudah Low-Low. Start ulang setelah level naik.";
+  if (pm.msg) info += "\n" + pm.msg;
+  if (!pm.on) {
+    info += "\nPerkiraan wash tank overflow: " + KEYS.map(k => {
+      const e = etaOverflow(k);
+      const txt = e === 0 ? "sudah overflow"
+        : e === Infinity ? (feed(k).gross === 0 ? "belum ada fluida masuk" : "tidak akan overflow (air keluar ≥ fluida masuk)")
+        : "± " + num(e, 1) + " jam lagi";
+      return `${k} ${txt}`;
+    }).join(", ") + ".";
+  }
+  setText("pumpInfo", info);
+  $("#pumpInfo").classList.toggle("warn", !!(pm.msg || pm.trip));
+  // loading tanker
+  const LS = S.load, LC = CONFIG.loading, nOn = Object.values(LS.pumps).filter(p => p.on).length;
+  LC.pumps.forEach(id => {
+    const p = LS.pumps[id];
+    setPump(`L${id}`, p.on);
+    setText(`P_L${id}_q`, `${num(p.on && nOn ? LS.q / nOn / M3H_TO_BPD : 0)} m³/jam`);
+    const b = $(`#loadBtn${id}`);
+    b.textContent = `${p.on ? "Stop" : "Start"} ${LC.label} ${id}`;
+    b.setAttribute("aria-pressed", p.on);
+  });
+  setText("tanker_v1", `Dimuat ${num(LS.loaded)} bbl (${num(LS.loaded / BBL_PER_M3)} m³)`);
+  setText("tanker_v2", `${num(LS.q / M3H_TO_BPD)} m³/jam`);
+  const ld = [];
+  KEYS.forEach(k => S.trains[k].storage.forEach((s, i) => { if (s.outOpen) ld.push(`${CONFIG.trains[k].storage[i].name} ${num(s.qout / M3H_TO_BPD)} m³/jam`); }));
+  let linfo = `Laju loading ${num(LS.q / M3H_TO_BPD)} m³/jam (${num(LS.q)} BOPD)\nSuction: ` + (ld.length ? ld.join(", ") : "semua XV-O tertutup");
+  const ltrip = Object.values(LS.pumps).some(p => p.trip);
+  if (ltrip) linfo += "\nPompa loading trip karena storage tank sudah Low-Low.";
+  if (LS.msg) linfo += "\n" + LS.msg;
+  setText("loadInfo", linfo);
+  $("#loadInfo").classList.toggle("warn", !!(LS.msg || ltrip));
+  // aliran di pipa
+  const F = flowState();
+  document.querySelectorAll("[data-flow]").forEach(e => e.classList.toggle("on", !!F[e.dataset.flow]));
+  // badge alarm per tangki
+  document.querySelectorAll(".badge").forEach(b => b.setAttribute("visibility", "hidden"));
+  document.querySelectorAll(".vbox").forEach(b => b.classList.remove("h", "hh"));
+  alarms.forEach(a => {
+    if (!a.tank || !a.tag) return;
+    const t = sid(a.tank), b = document.getElementById(`${t}_badge`);
+    if (!b || b.getAttribute("visibility") === "visible") return;
+    b.setAttribute("visibility", "visible");
+    b.classList.toggle("hh", a.pr === "hh");
+    $(`#${t}_badgeT`).textContent = a.tag;
+    $(`#${t}_box`).classList.add(a.pr);
+  });
+  const html = alarms.length
+    ? alarms.map(a => `<li class="${a.pr}">${a.msg}<br><small>Sejak ${fmtTime(a.since)}</small></li>`).join("")
+    : `<li class="none">Tidak ada alarm aktif.</li>`;
+  if ($("#alarmList").innerHTML !== html) $("#alarmList").innerHTML = html;
+}
+
+/* ---------------- Tren ---------------- */
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function drawTrend() {
+  const cv = $("#trend"), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr);
+  const Wd = r.width, Ht = r.height, m = { l: 44, r: 12, t: 34, b: 26 };
+  const pw = Wd - m.l - m.r, ph = Ht - m.t - m.b;
+  const font = `13px ${getComputedStyle(document.body).fontFamily}`;
+  const colors = ["--t1", "--t2", "--t3", "--t4", "--t5", "--t6", "--t7"].map(cssVar);
+  g.clearRect(0, 0, Wd, Ht); g.font = font;
+  g.strokeStyle = cssVar("--grid"); g.fillStyle = cssVar("--muted"); g.lineWidth = 1;
+  for (let v = 0; v <= 100; v += 25) {
+    const y = m.t + ph * (1 - v / 100);
+    g.beginPath(); g.moveTo(m.l, y); g.lineTo(m.l + pw, y); g.stroke();
+    g.textAlign = "right"; g.fillText(v + " %", m.l - 6, y + 4);
+  }
+  const c = CONFIG.trains[trendTab];
+  const series = [
+    { label: "Wash total", f: h => h.wash },
+    { label: "Wash air", f: h => h.washW, dash: true },
+    ...c.products.map((x, j) => ({ label: x.name, f: h => h.prod[j] })),
+    ...c.storage.map((s, i) => ({ label: s.name.split(" ")[0], f: h => h.st[i] })),
+  ];
+  let lx = m.l;
+  series.forEach((s, i) => {
+    g.strokeStyle = colors[i % colors.length]; g.lineWidth = 2.5; g.setLineDash(s.dash ? [5, 4] : []);
+    g.beginPath(); g.moveTo(lx, 15); g.lineTo(lx + 18, 15); g.stroke(); g.setLineDash([]);
+    g.fillStyle = cssVar("--text2"); g.textAlign = "left"; g.fillText(s.label, lx + 24, 19);
+    lx += 34 + g.measureText(s.label).width + 8;
+  });
+  if (history.length < 2) {
+    g.fillStyle = cssVar("--muted"); g.textAlign = "center";
+    g.fillText("Isi data produksi lalu tekan Jalankan untuk melihat tren level.", m.l + pw / 2, m.t + ph / 2);
+    return;
+  }
+  const t0 = history[0].t, t1 = Math.max(history[history.length - 1].t, t0 + 3600);
+  g.fillStyle = cssVar("--muted"); g.textAlign = "center";
+  for (let i = 0; i <= 5; i++) g.fillText(num((t0 + (t1 - t0) * i / 5) / 3600, 1) + " jam", m.l + pw * i / 5, Ht - 6);
+  series.forEach((s, i) => {
+    g.strokeStyle = colors[i % colors.length]; g.lineWidth = 2; g.setLineDash(s.dash ? [5, 4] : []);
+    g.beginPath();
+    history.forEach((h, j) => {
+      const x = m.l + pw * (h.t - t0) / (t1 - t0), y = m.t + ph * (1 - Math.min(100, s.f(h[trendTab])) / 100);
+      j ? g.lineTo(x, y) : g.moveTo(x, y);
+    });
+    g.stroke(); g.setLineDash([]);
+  });
+}
+
+/* ---------------- Tampilan 3D (three.js r128 dari cdnjs) ----------------
+   Skala dalam meter. Tangki digambar sesuai diameter dan tinggi dari CONFIG,
+   dengan potongan (cutaway) di sisi depan agar level cairan terlihat.        */
+const V3 = { ready: false, on: false, objs: {}, flows: [], valves: [], pumps: {}, labels: [], t: 0, lastLabel: 0 };
+const L3 = {
+  wash: { PJCO: { x: -75, z: -78 }, MCO: { x: 55, z: -78 } },
+  prod: { PJCO: [{ x: -97, z: -42 }, { x: -60, z: -42 }], MCO: [{ x: 35, z: -42 }, { x: 72, z: -42 }] },
+  stor: { PJCO: [{ x: -118, z: 15 }, { x: -70, z: 15 }], MCO: [{ x: -15, z: 15 }, { x: 30, z: 15 }, { x: 80, z: 15 }] },
+  ovZ: -58, sucZ: -27, pumpTR: { x: -15, z: -20 }, disZ: -10,
+  loadZ: 46, LA: { x: -30, z: 54 }, LB: { x: -8, z: 54 }, ldDisZ: 64, tanker: { x: 72, z: 88 },
+};
+function load3D() {
+  return new Promise((res, rej) => {
+    if (window.THREE) return res();
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+}
+function tankRadius(t) {
+  if (t.od) return t.od / 2000;
+  return Math.sqrt(t.cap / BBL_PER_M3 / t.height / Math.PI);
+}
+function col(v) { return new THREE.Color(cssVar(v)); }
+
+function build3D() {
+  const T = THREE, cv = $("#c3d");
+  const R = new T.WebGLRenderer({ canvas: cv, antialias: true });
+  R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
+  const scene = new T.Scene();
+  const camera = new T.PerspectiveCamera(40, 1, 1, 2000);
+  V3.R = R; V3.scene = scene; V3.camera = camera;
+
+  scene.add(new T.HemisphereLight(0xdfe8f0, 0x2a3440, 0.75));
+  const sun = new T.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(-120, 200, 140); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -200, right: 200, top: 200, bottom: -200, near: 10, far: 600 });
+  sun.shadow.camera.updateProjectionMatrix();
+  scene.add(sun);
+
+  // material bersama
+  V3.mat = {
+    ground: new T.MeshStandardMaterial({ roughness: 1 }),
+    pad: new T.MeshStandardMaterial({ roughness: 0.95, transparent: true, opacity: 0.6 }),
+    steel: new T.MeshStandardMaterial({ color: 0x9aa8b6, metalness: 0.55, roughness: 0.42, side: T.DoubleSide }),
+    steelDim: new T.MeshStandardMaterial({ color: 0x5d6873, metalness: 0.4, roughness: 0.6, side: T.DoubleSide }),
+    roof: new T.MeshStandardMaterial({ color: 0x8796a5, metalness: 0.5, roughness: 0.5 }),
+    pipe: new T.MeshStandardMaterial({ color: 0x6b7c8c, metalness: 0.5, roughness: 0.45 }),
+    oil: new T.MeshStandardMaterial({ roughness: 0.25, metalness: 0.05 }),
+    water: new T.MeshStandardMaterial({ roughness: 0.15, metalness: 0.05, transparent: true, opacity: 0.92 }),
+    safe: new T.MeshBasicMaterial({ color: 0xffffff }),
+    hull: new T.MeshStandardMaterial({ color: 0x8b3a32, metalness: 0.3, roughness: 0.6 }),
+    deck: new T.MeshStandardMaterial({ color: 0x7c8a96, metalness: 0.3, roughness: 0.7 }),
+  };
+  const ground = new T.Mesh(new T.PlaneGeometry(600, 500), V3.mat.ground);
+  ground.rotation.x = -Math.PI / 2; ground.position.set(-10, -0.01, 5); ground.receiveShadow = true;
+  scene.add(ground);
+  // area beton per zona
+  [[-95, -40, 140, 140], [40, -40, 140, 140], [-20, 15, 250, 60], [0, 70, 220, 60]].forEach(([x, z, w, d]) => {
+    const p = new T.Mesh(new T.PlaneGeometry(w, d), V3.mat.pad);
+    p.rotation.x = -Math.PI / 2; p.position.set(x, 0.01, z); p.receiveShadow = true; scene.add(p);
+  });
+
+  // tekstur aliran: titik-titik yang digeser di sepanjang pipa
+  const tc = document.createElement("canvas"); tc.width = 64; tc.height = 8;
+  const g = tc.getContext("2d"); g.fillStyle = "#fff"; g.beginPath(); g.arc(16, 4, 3.5, 0, Math.PI * 2); g.fill();
+  V3.flowTex = new T.CanvasTexture(tc);
+
+  for (const k of KEYS) buildTrain3D(k);
+  buildPumps3D();
+  buildZoneLabels3D();
+  apply3DTheme();
+  setupCamera3D();
+  new ResizeObserver(resize3D).observe($("#hmi3d"));
+  V3.ready = true;
+}
+
+/* ---------- pembentuk objek ---------- */
+function addPipe3D(pts, flow, fluid, y = 1.2) {
+  const T = THREE, path = new T.CurvePath();
+  const v = pts.map(p => new T.Vector3(p[0], p.length > 2 ? p[2] : y, p[1]));
+  let len = 0;
+  for (let i = 1; i < v.length; i++) { path.add(new T.LineCurve3(v[i - 1], v[i])); len += v[i].distanceTo(v[i - 1]); }
+  const segs = Math.max(8, Math.round(len / 2));
+  const tube = new T.Mesh(new T.TubeGeometry(path, segs, 0.35, 8, false), V3.mat.pipe);
+  tube.castShadow = true; V3.scene.add(tube);
+  // sambungan siku
+  v.forEach(p => { const b = new T.Mesh(new T.SphereGeometry(0.42, 10, 8), V3.mat.pipe); b.position.copy(p); V3.scene.add(b); });
+  if (flow) {
+    const tex = V3.flowTex.clone(); tex.needsUpdate = true;
+    tex.wrapS = T.RepeatWrapping; tex.repeat.set(len / 2.2, 1);
+    const m = new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    const o = new T.Mesh(new T.TubeGeometry(path, segs, 0.44, 8, false), m);
+    o.visible = false; V3.scene.add(o);
+    V3.flows.push({ key: flow, fluid, mesh: o, tex });
+  }
+  return v;
+}
+function addValve3D(x, z, data, locked = false, y = 1.2) {
+  const T = THREE;
+  const m = new T.Mesh(new T.BoxGeometry(1.5, 1.5, 1.5), new T.MeshStandardMaterial({ roughness: 0.4 }));
+  m.position.set(x, y, z); m.castShadow = true;
+  const hw = new T.Mesh(new T.CylinderGeometry(0.9, 0.9, 0.2, 16), m.material);
+  hw.position.set(0, 1.3, 0); m.add(hw);
+  m.userData = { valve: data, locked };
+  V3.scene.add(m); V3.valves.push(m);
+}
+function makeLabel3D(lines, opt = {}) {
+  const T = THREE, c = document.createElement("canvas");
+  c.width = 512; c.height = opt.big ? 96 : 200;
+  const tex = new T.CanvasTexture(c);
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const w = opt.w || 18; sp.scale.set(w, w * c.height / c.width, 1);
+  sp.renderOrder = 10;
+  const lab = { sp, c, tex, last: "", opt };
+  drawLabel3D(lab, lines, null);
+  V3.scene.add(sp);
+  return lab;
+}
+function drawLabel3D(lab, lines, alarm) {
+  const key = lines.join("|") + (alarm || "") + document.documentElement.dataset.theme;
+  if (key === lab.last) return; lab.last = key;
+  const g = lab.c.getContext("2d"), W = lab.c.width, H = lab.c.height;
+  const font = getComputedStyle(document.body).fontFamily;
+  g.clearRect(0, 0, W, H);
+  if (lab.opt.big) {
+    g.font = `600 64px ${font}`; g.fillStyle = cssVar("--muted"); g.textAlign = "left"; g.fillText(lines[0], 8, 66);
+  } else {
+    g.fillStyle = cssVar("--panel"); g.globalAlpha = 0.9;
+    roundRect(g, 4, 4, W - 8, H - 8, 18); g.fill(); g.globalAlpha = 1;
+    g.lineWidth = alarm ? 8 : 2; g.strokeStyle = alarm === "hh" ? cssVar("--alm-hh") : alarm === "h" ? cssVar("--alm-h") : cssVar("--edge");
+    roundRect(g, 4, 4, W - 8, H - 8, 18); g.stroke();
+    g.textAlign = "left";
+    g.font = `600 44px ${font}`; g.fillStyle = cssVar("--text"); g.fillText(lines[0], 26, 58);
+    g.font = `600 40px ${font}`; g.fillStyle = cssVar("--text"); g.fillText(lines[1] || "", 26, 112);
+    g.font = `34px ${font}`; g.fillStyle = cssVar("--text2"); g.fillText(lines[2] || "", 26, 164);
+  }
+  lab.tex.needsUpdate = true;
+}
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function addTank3D(cfg, pos, opt = {}) {
+  const T = THREE, r = tankRadius(cfg), h = cfg.height, grp = new T.Group();
+  grp.position.set(pos.x, 0, pos.z);
+  const win = Math.PI * 0.55; // jendela potongan menghadap kamera (+z)
+  const shell = new T.Mesh(new T.CylinderGeometry(r, r, h, 56, 1, true, win / 2, Math.PI * 2 - win),
+                           opt.oos ? V3.mat.steelDim : V3.mat.steel);
+  shell.position.y = h / 2; shell.castShadow = true; shell.receiveShadow = true; grp.add(shell);
+  const floor = new T.Mesh(new T.CircleGeometry(r, 48), V3.mat.steelDim);
+  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.05; grp.add(floor);
+  const base = new T.Mesh(new T.CylinderGeometry(r * 1.05, r * 1.07, 0.5, 56), V3.mat.roof);
+  base.position.y = -0.2; base.receiveShadow = true; grp.add(base);
+  const roofH = Math.max(1.2, r * 0.17);
+  const roof = new T.Mesh(new T.ConeGeometry(r * 1.02, roofH, 56, 1, true, win / 2, Math.PI * 2 - win), V3.mat.roof);
+  roof.material = roof.material.clone(); roof.material.side = T.DoubleSide;
+  roof.position.y = h + roofH / 2; roof.castShadow = true; grp.add(roof);
+  // tepi potongan
+  [win / 2, -win / 2].forEach(a => {
+    const e = new T.Mesh(new T.BoxGeometry(0.25, h, 0.25), V3.mat.roof);
+    e.position.set(r * Math.sin(a), h / 2, r * Math.cos(a)); grp.add(e);
+  });
+  const liq = (mat) => {
+    const m = new T.Mesh(new T.CylinderGeometry(r * 0.985, r * 0.985, 1, 56), mat);
+    m.visible = false; grp.add(m); return m;
+  };
+  const tank = { r, h, grp, roofH, oil: liq(V3.mat.oil), water: opt.wash ? liq(V3.mat.water) : null };
+  if (opt.safeM) {
+    const ring = new T.Mesh(new T.TorusGeometry(r * 1.01, 0.08, 6, 64, Math.PI * 2 - win), V3.mat.safe);
+    ring.rotation.x = Math.PI / 2; ring.rotation.z = Math.PI / 2 + win / 2; ring.position.y = opt.safeM; grp.add(ring);
+  }
+  tank.label = makeLabel3D([cfg.name, "", ""], { w: Math.max(16, r * 1.3) });
+  tank.label.sp.position.set(pos.x, h + roofH + tank.label.sp.scale.y / 2 + 2, pos.z);
+  V3.scene.add(grp);
+  return tank;
+}
+function setLiquid(m, y0, y1) {
+  const hh = Math.max(0, y1 - y0);
+  m.visible = hh > 0.02; m.scale.y = Math.max(0.001, hh); m.position.y = y0 + hh / 2;
+}
+
+function buildTrain3D(k) {
+  const c = CONFIG.trains[k], W = L3.wash[k], O = V3.objs;
+  const wash = addTank3D(c.wash, W, { wash: true });
+  O[c.wash.name] = { ...wash, kind: "wash", k };
+  const wr = wash.r;
+  // fluida produksi
+  if (c.sources.length > 1) {
+    const mx = W.x - wr - 18, zs = c.sources.map((_, i) => W.z - 12 + i * 6);
+    c.sources.forEach((s, i) => {
+      addPipe3D([[mx - 30, zs[i]], [mx, zs[i]]], `${k}_src${i}`, "emul", 3);
+      const lb = makeLabel3D([s.name], { big: true, w: 14 }); lb.sp.position.set(mx - 36, 4, zs[i]);
+      V3.labels.push({ lab: lb, src: [k, i] });
+    });
+    addPipe3D([[mx, zs[0]], [mx, zs[zs.length - 1]]], `${k}_mani`, "emul", 3);
+    addPipe3D([[mx, W.z], [W.x - wr, W.z]], `${k}_in`, "emul", 3);
+  } else {
+    addPipe3D([[W.x - wr - 40, W.z], [W.x - wr, W.z]], `${k}_in`, "emul", 3);
+    const lb = makeLabel3D([`Fluida ${k}`], { big: true, w: 16 }); lb.sp.position.set(W.x - wr - 46, 5, W.z);
+  }
+  // air keluar ke depan-kiri
+  const wy = 0.8, wz = W.z + wr + 6;
+  addPipe3D([[W.x - wr * 0.7, W.z + wr * 0.7], [W.x - wr * 0.7, wz], [W.x - wr - 10, wz]], `${k}_wout`, "water", wy);
+  addValve3D(W.x - wr * 0.7, W.z + wr + 2.5, `${k}:water`, false, wy);
+  const drain = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 20), V3.mat.steelDim);
+  drain.position.set(W.x - wr - 11, 0.15, wz); V3.scene.add(drain);
+  // overflow -> header -> product tank (dari atas)
+  const oy = c.wash.height * c.wash.overflow / 100, hy = Math.max(oy, ...c.products.map(p => p.height)) + 3;
+  const P0 = L3.prod[k];
+  addPipe3D([[W.x, W.z + wr], [W.x, L3.ovZ, oy], [W.x, L3.ovZ, hy]].map(p => p.length > 2 ? p : [p[0], p[1], oy]), `${k}_ov`, "oil");
+  addPipe3D([[Math.min(...P0.map(p => p.x)), L3.ovZ, hy], [Math.max(...P0.map(p => p.x)), L3.ovZ, hy]], `${k}_ov`, "oil");
+  c.products.forEach((pc, j) => {
+    const pos = P0[j], t = addTank3D(pc, pos, { safeM: pc.workM });
+    O[pc.name] = { ...t, kind: "prod", k, j };
+    addPipe3D([[pos.x, L3.ovZ, hy], [pos.x, pos.z - t.r * 0.5, hy], [pos.x, pos.z - t.r * 0.5, pc.height + t.roofH * 0.6]], `${k}_pin${j}`, "oil");
+    addValve3D(pos.x, L3.ovZ + 4, `${k}:in${j}`, false, hy);
+    addPipe3D([[pos.x, pos.z + t.r], [pos.x, L3.sucZ]], `${k}_psuc${j}`, "oil", 0.8);
+    addValve3D(pos.x, pos.z + t.r + 2.5, `${k}:suc${j}`, false, 0.8);
+  });
+  // storage
+  c.storage.forEach((sc, i) => {
+    const pos = L3.stor[k][i], locked = sc.inService === false;
+    const t = addTank3D(sc, pos, { safeM: sc.workM, oos: locked });
+    O[sc.name] = { ...t, kind: "stor", k, i };
+    addPipe3D([[pos.x, L3.disZ], [pos.x, pos.z - t.r]], `${k}_sin${i}`, "oil", 1.8);
+    addValve3D(pos.x, L3.disZ + 3.5, `${k}:${i}`, locked, 1.8);
+    addPipe3D([[pos.x, pos.z + t.r], [pos.x, L3.loadZ]], `${k}_sout${i}`, "oil", 0.8);
+    addValve3D(pos.x, pos.z + t.r + 3, `${k}:out${i}`, locked, 0.8);
+  });
+}
+function addPump3D(id, x, z, name) {
+  const T = THREE, grp = new T.Group(); grp.position.set(x, 0, z);
+  const skid = new T.Mesh(new T.BoxGeometry(5, 0.5, 3.4), V3.mat.roof); skid.position.y = 0.25; grp.add(skid);
+  const casing = new T.Mesh(new T.CylinderGeometry(1.4, 1.4, 1.2, 24), new T.MeshStandardMaterial({ roughness: 0.4, metalness: 0.3 }));
+  casing.rotation.x = Math.PI / 2; casing.position.set(-0.9, 1.6, 0); grp.add(casing);
+  const motor = new T.Mesh(new T.CylinderGeometry(0.95, 0.95, 2.6, 20), V3.mat.steel);
+  motor.rotation.z = Math.PI / 2; motor.position.set(1.2, 1.6, 0); grp.add(motor);
+  const fan = new T.Mesh(new T.TorusGeometry(1.1, 0.12, 6, 18, Math.PI * 1.5), new T.MeshBasicMaterial({ color: 0xffffff }));
+  fan.position.set(-0.9, 1.6, 0.7); grp.add(fan);
+  [casing, motor, skid].forEach(m => { m.castShadow = true; m.userData = { pump: id }; });
+  V3.scene.add(grp);
+  const lab = makeLabel3D([name, "", ""], { w: 15 }); lab.sp.position.set(x, 8, z);
+  V3.pumps[id] = { grp, casing, fan, lab, name };
+}
+function buildPumps3D() {
+  const xs = [], sx = [], ox = [];
+  for (const k of KEYS) { L3.prod[k].forEach(p => sx.push(p.x)); L3.stor[k].forEach(p => { xs.push(p.x); ox.push(p.x); }); }
+  const P = L3.pumpTR;
+  addPipe3D([[Math.min(...sx), L3.sucZ], [Math.max(...sx), L3.sucZ]], "tr_suc", "oil", 0.8);
+  addPipe3D([[P.x, L3.sucZ], [P.x, P.z - 1.5]], "tr_suc", "oil", 0.8);
+  addPipe3D([[P.x, P.z + 1.5, 1.6], [P.x, L3.disZ, 1.6], [Math.min(...xs), L3.disZ, 1.8], [Math.max(...xs), L3.disZ, 1.8]].map(p => [p[0], p[1], p[2]]), "tr_dis", "oil");
+  addPump3D("TR", P.x, P.z, CONFIG.pump.name);
+  // loading tanker
+  addPipe3D([[Math.min(...ox), L3.loadZ], [Math.max(...ox), L3.loadZ]], "ld_hdr", "oil", 0.8);
+  const LC = CONFIG.loading, tk = L3.tanker;
+  CONFIG.loading.pumps.forEach(id => {
+    const p = L3["L" + id];
+    addPipe3D([[p.x, L3.loadZ], [p.x, p.z - 1.5]], `ld_${id}`, "oil", 0.8);
+    addPipe3D([[p.x, p.z + 1.5], [p.x, L3.ldDisZ]], `ld_${id}`, "oil", 1.6);
+    addPump3D(`L${id}`, p.x, p.z, `${LC.label} ${id}`);
+  });
+  const lx = LC.pumps.map(id => L3["L" + id].x);
+  addPipe3D([[Math.min(...lx), L3.ldDisZ], [tk.x - 20, L3.ldDisZ], [tk.x - 20, tk.z - 8]], "ld_tanker", "oil", 1.6);
+  // kapal tanker
+  const T = THREE, ship = new T.Group(); ship.position.set(tk.x, 0, tk.z);
+  const shape = new T.Shape();
+  shape.moveTo(-36, -7); shape.lineTo(28, -7); shape.quadraticCurveTo(42, 0, 28, 7); shape.lineTo(-36, 7); shape.lineTo(-36, -7);
+  const hull = new T.Mesh(new T.ExtrudeGeometry(shape, { depth: 5, bevelEnabled: false }), V3.mat.hull);
+  hull.rotation.x = -Math.PI / 2; hull.position.y = 0.2; hull.castShadow = true; ship.add(hull);
+  const deck = new T.Mesh(new T.BoxGeometry(62, 0.3, 12.4), V3.mat.deck); deck.position.set(-3, 5.3, 0); ship.add(deck);
+  const bridge = new T.Mesh(new T.BoxGeometry(8, 7, 10), V3.mat.steel); bridge.position.set(-30, 8.8, 0); bridge.castShadow = true; ship.add(bridge);
+  const stack = new T.Mesh(new T.CylinderGeometry(1, 1.2, 4, 12), V3.mat.hull); stack.position.set(-32, 14, 0); ship.add(stack);
+  V3.scene.add(ship);
+  const water = new T.Mesh(new T.PlaneGeometry(160, 40), new T.MeshStandardMaterial({ color: 0x2f5f80, roughness: 0.2, transparent: true, opacity: 0.8 }));
+  water.rotation.x = -Math.PI / 2; water.position.set(tk.x, 0.05, tk.z); V3.scene.add(water); V3.sea = water;
+  V3.tankerLab = makeLabel3D(["Tanker", "", ""], { w: 20 }); V3.tankerLab.sp.position.set(tk.x, 20, tk.z);
+}
+function buildZoneLabels3D() {
+  [["PJCO", -150, -100], ["MCO", 0, -100], ["Storage", -150, -12], ["Loading tanker", -150, 44]].forEach(([t, x, z]) => {
+    const lb = makeLabel3D([t], { big: true, w: 28 }); lb.sp.position.set(x + 14, 3, z);
+    V3.labels.push({ lab: lb, zone: t });
+  });
+}
+
+/* ---------- kamera: putar (seret), geser (klik kanan / Shift), zoom (gulir / cubit) ---------- */
+function setupCamera3D() {
+  const T = THREE, cv = $("#c3d");
+  V3.cam = { theta: 0.08, phi: 0.92, r: 300, target: new T.Vector3(-20, 0, -5) };
+  const ptrs = new Map(); let moved = 0, pinch = 0;
+  const ray = new T.Raycaster(), ndc = new T.Vector2();
+  cv.addEventListener("contextmenu", e => e.preventDefault());
+  cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, b: e.button, s: e.shiftKey }); moved = 0; });
+  cv.addEventListener("pointermove", e => {
+    const p = ptrs.get(e.pointerId);
+    if (!p) { hover3D(e); return; }
+    const dx = e.clientX - p.x, dy = e.clientY - p.y; moved += Math.abs(dx) + Math.abs(dy);
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()]; p.x = e.clientX; p.y = e.clientY;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch) V3.cam.r = Math.min(700, Math.max(50, V3.cam.r * pinch / d));
+      pinch = d; return;
+    }
+    p.x = e.clientX; p.y = e.clientY;
+    if (p.b === 2 || p.s) {
+      const s = V3.cam.r / 600, th = V3.cam.theta;
+      V3.cam.target.x -= (dx * Math.cos(th) + dy * Math.sin(th)) * s;
+      V3.cam.target.z -= (-dx * Math.sin(th) + dy * Math.cos(th)) * s;
+    } else {
+      V3.cam.theta -= dx * 0.005;
+      V3.cam.phi = Math.min(1.45, Math.max(0.2, V3.cam.phi - dy * 0.005));
+    }
+  });
+  const up = e => {
+    ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0;
+    if (moved < 6 && e.type === "pointerup") pick3D(e, ray, ndc);
+  };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  cv.addEventListener("wheel", e => { e.preventDefault(); V3.cam.r = Math.min(700, Math.max(50, V3.cam.r * (1 + e.deltaY * 0.001))); }, { passive: false });
+  V3.ray = ray; V3.ndc = ndc;
+}
+function reset3DCamera() { V3.cam.theta = 0.08; V3.cam.phi = 0.92; V3.cam.r = 300; V3.cam.target.set(-20, 0, -5); }
+function pickables() {
+  const list = V3.valves.filter(v => !v.userData.locked);
+  Object.values(V3.pumps).forEach(p => p.grp.children.forEach(m => { if (m.userData.pump) list.push(m); }));
+  return list;
+}
+function hit3D(e) {
+  const r = $("#c3d").getBoundingClientRect();
+  V3.ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  V3.ray.setFromCamera(V3.ndc, V3.camera);
+  const h = V3.ray.intersectObjects(pickables(), false)[0];
+  return h ? h.object.userData : null;
+}
+function pick3D(e) {
+  const u = hit3D(e); if (!u) return;
+  if (u.pump === "TR") togglePump();
+  else if (u.pump) toggleLoad(u.pump.slice(1));
+  else if (u.valve) toggleValve(u.valve);
+}
+function hover3D(e) { $("#c3d").style.cursor = hit3D(e) ? "pointer" : "grab"; }
+function resize3D() {
+  if (!V3.ready) return;
+  const box = $("#hmi3d").getBoundingClientRect();
+  V3.R.setSize(box.width, box.height, false);
+  V3.camera.aspect = box.width / Math.max(1, box.height); V3.camera.updateProjectionMatrix();
+}
+function apply3DTheme() {
+  if (!window.THREE || !V3.mat) return;
+  const dark = document.documentElement.dataset.theme !== "light";
+  V3.scene.background = col("--bg");
+  V3.scene.fog = new THREE.Fog(col("--bg"), 420, 900);
+  V3.mat.ground.color = dark ? new THREE.Color(0x222d38) : new THREE.Color(0xc4cbd1);
+  V3.mat.pad.color = dark ? new THREE.Color(0x2c3a48) : new THREE.Color(0xd9dee2);
+  V3.mat.oil.color = col("--oil"); V3.mat.water.color = col("--water");
+  V3.mat.safe.color = col("--text2");
+  V3.flows.forEach(f => { f.mesh.material.color = col(f.fluid === "water" ? "--water" : f.fluid === "emul" ? "--emul" : "--oil"); });
+  V3.labels.forEach(l => { l.lab.last = ""; });
+  Object.values(V3.objs).forEach(o => { o.label.last = ""; });
+  Object.values(V3.pumps).forEach(p => { p.lab.last = ""; });
+  if (V3.tankerLab) V3.tankerLab.last = "";
+}
+
+/* ---------- pembaruan tiap frame ---------- */
+function frame3D(dt) {
+  if (!V3.ready) return;
+  V3.t += dt;
+  const c3 = V3.cam, cam = V3.camera;
+  cam.position.set(c3.target.x + c3.r * Math.sin(c3.phi) * Math.sin(c3.theta),
+                   c3.target.y + c3.r * Math.cos(c3.phi),
+                   c3.target.z + c3.r * Math.sin(c3.phi) * Math.cos(c3.theta));
+  cam.lookAt(c3.target);
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // level cairan
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k], O = V3.objs;
+    const w = O[c.wash.name], hw = c.wash.height;
+    const yw = st.wash.Vw / c.wash.cap * hw, yt = (st.wash.Vw + st.wash.Vo) / c.wash.cap * hw;
+    setLiquid(w.water, 0, yw); setLiquid(w.oil, yw, yt);
+    st.products.forEach((x, j) => { const pc = c.products[j]; setLiquid(O[pc.name].oil, 0, x.V / pc.cap * pc.height); });
+    st.storage.forEach((s, i) => { const sc = c.storage[i]; setLiquid(O[sc.name].oil, 0, s.V / sc.cap * sc.height); });
+  }
+  // aliran, valve, pompa
+  const F = flowState();
+  V3.flows.forEach(f => {
+    f.mesh.visible = !!F[f.key];
+    if (f.mesh.visible && !reduce) f.tex.offset.x -= dt * 1.6;
+  });
+  const onC = col("--on"), offC = col("--panel2"), lockC = col("--edge");
+  V3.valves.forEach(v => {
+    const [k, w] = v.userData.valve.split(":"), st = S.trains[k];
+    let open;
+    if (w === "water") open = P[k].xv > 0;
+    else if (w.startsWith("in")) open = st.products[+w.slice(2)].inOpen;
+    else if (w.startsWith("suc")) open = st.products[+w.slice(3)].sucOpen;
+    else if (w.startsWith("out")) open = st.storage[+w.slice(3)].outOpen;
+    else open = st.storage[+w].open;
+    v.material.color = v.userData.locked ? lockC : open ? onC : offC;
+  });
+  const runs = { TR: S.pump.on };
+  CONFIG.loading.pumps.forEach(id => { runs["L" + id] = S.load.pumps[id].on; });
+  Object.entries(V3.pumps).forEach(([id, p]) => {
+    p.casing.material.color = runs[id] ? onC : offC;
+    p.fan.visible = runs[id];
+    if (runs[id] && !reduce) p.fan.rotation.z -= dt * 6;
+  });
+  // label (diperbarui tiap 0,4 detik)
+  if (V3.t - V3.lastLabel > 0.4) { V3.lastLabel = V3.t; update3DLabels(); }
+  V3.R.render(V3.scene, cam);
+}
+function update3DLabels() {
+  const alarmOf = {};
+  collectAlarms().forEach(a => { if (a.tank && (!alarmOf[a.tank] || a.pr === "hh")) alarmOf[a.tank] = a.pr; });
+  for (const [k, c] of Object.entries(CONFIG.trains)) {
+    const st = S.trains[k], O = V3.objs;
+    const wp = pct(st.wash.Vw + st.wash.Vo, c.wash.cap);
+    drawLabel3D(O[c.wash.name].label, [c.wash.name, `${num(wp / 100 * c.wash.height, 2)} m   ${num(wp, 1)} %`,
+      `Air ${num(pct(st.wash.Vw, c.wash.cap), 1)} %, ${rateTxt(st.wash.rate).toLowerCase()}`], alarmOf[c.wash.name]);
+    st.products.forEach((x, j) => {
+      const pc = c.products[j], pp = pct(x.V, pc.cap);
+      drawLabel3D(O[pc.name].label, [pc.name, `${num(pp / 100 * pc.height, 2)} m   ${num(pp, 1)} %`, rateTxt(x.rate)], alarmOf[pc.name]);
+    });
+    st.storage.forEach((s, i) => {
+      const sc = c.storage[i], sp = pct(s.V, sc.cap);
+      drawLabel3D(O[sc.name].label, [sc.name, `${num(sp / 100 * sc.height, 2)} m   ${num(sp, 1)} %`,
+        sc.inService === false ? "Tidak digunakan" : rateTxt(s.rate)], alarmOf[sc.name]);
+    });
+  }
+  V3.labels.forEach(l => {
+    if (l.src) { const [k, i] = l.src, x = P[k].sources[i]; drawLabel3D(l.lab, [`${CONFIG.trains[k].sources[i].name} ${num(x.gross)} BFPD`]); }
+    else drawLabel3D(l.lab, [l.zone]);
+  });
+  const nOn = Object.values(S.load.pumps).filter(p => p.on).length;
+  Object.entries(V3.pumps).forEach(([id, p]) => {
+    const q = id === "TR" ? S.pump.q : (S.load.pumps[id.slice(1)].on && nOn ? S.load.q / nOn : 0);
+    const on = id === "TR" ? S.pump.on : S.load.pumps[id.slice(1)].on;
+    drawLabel3D(p.lab, [p.name, `${num(q / M3H_TO_BPD)} m³/jam`, on ? "Jalan" : "Berhenti"]);
+  });
+  drawLabel3D(V3.tankerLab, ["Tanker", `Dimuat ${num(S.load.loaded)} bbl`, `${num(S.load.q / M3H_TO_BPD)} m³/jam`]);
+}
+async function setView(mode) {
+  const is3 = mode === "3d";
+  $("#v2d").setAttribute("aria-pressed", !is3); $("#v3d").setAttribute("aria-pressed", is3);
+  $("#hmi").hidden = is3; $("#hmi3d").hidden = !is3; $("#camReset").hidden = !is3; $("#hint3d").hidden = !is3;
+  V3.on = false;
+  if (!is3) return;
+  if (!V3.ready) {
+    $("#msg3d").textContent = "Memuat tampilan 3D…"; $("#msg3d").hidden = false;
+    try { await load3D(); build3D(); $("#msg3d").hidden = true; }
+    catch (err) {
+      $("#msg3d").textContent = "Tampilan 3D gagal dimuat. Pastikan perangkat terhubung ke internet (library three.js diambil dari cdnjs), lalu coba lagi.";
+      return;
+    }
+  }
+  V3.on = true; resize3D();
+}
+
+/* ---------------- Interaksi ---------------- */
+function pumpPermissive() {
+  // syarat start: minimal satu product tank dengan XV-S terbuka dan level di atas Low-Low
+  const LL = CONFIG.alarm.LL, all = [];
+  KEYS.forEach(k => S.trains[k].products.forEach((x, j) => {
+    const pc = CONFIG.trains[k].products[j];
+    all.push({ k, j, x, name: pc.name, lvl: pct(x.V, pc.cap) });
+  }));
+  if (all.some(o => o.x.sucOpen && o.lvl > LL + 0.5)) return "";
+  const detail = all.map(o => `${o.name} ${num(o.lvl, 1)} % (${o.x.sucOpen ? `di bawah Low-Low ${LL} %` : `XV-S${o.j + 1} ${o.k} tertutup`})`).join("; ");
+  const hint = all.filter(o => !o.x.sucOpen && o.lvl > LL + 0.5);
+  return "Tidak bisa start. " + detail + "." +
+    (hint.length ? ` Buka ${hint.map(o => `XV-S${o.j + 1} ${o.k}`).join(" atau ")} lalu start lagi.`
+                 : " Product tank baru terisi setelah wash tank overflow.");
+}
+function togglePump() {
+  if (S.pump.on) { S.pump.on = false; S.pump.msg = ""; }
+  else {
+    const why = pumpPermissive();
+    if (why) S.pump.msg = why;
+    else { S.pump.on = true; S.pump.trip = false; S.pump.msg = ""; }
+  }
+  refresh();
+}
+function loadPermissive() {
+  const LL = CONFIG.alarm.LL, all = [];
+  KEYS.forEach(k => S.trains[k].storage.forEach((s, i) => {
+    const sc = CONFIG.trains[k].storage[i];
+    if (sc.inService !== false) all.push({ s, name: sc.name, lvl: pct(s.V, sc.cap) });
+  }));
+  if (all.some(o => o.s.outOpen && o.lvl > LL + 0.5)) return "";
+  const open = all.filter(o => o.s.outOpen);
+  if (!open.length) return "Tidak bisa start: semua XV-O storage tank tertutup. Buka XV-O tangki yang akan di-loading.";
+  return "Tidak bisa start: " + open.map(o => `${o.name} ${num(o.lvl, 1)} %`).join(", ") + ` masih di bawah Low-Low (${LL} %).`;
+}
+function toggleLoad(id) {
+  const p = S.load.pumps[id];
+  if (p.on) { p.on = false; S.load.msg = ""; }
+  else {
+    const why = loadPermissive();
+    if (why) S.load.msg = why;
+    else { p.on = true; p.trip = false; S.load.msg = ""; }
+  }
+  refresh();
+}
+function etaOverflow(k) {
+  const c = CONFIG.trains[k], st = S.trains[k], f = feed(k);
+  const Vov = c.wash.cap * c.wash.overflow / 100, Vt = st.wash.Vw + st.wash.Vo;
+  if (Vt >= Vov - 1e-6) return 0;
+  const net = f.gross - P[k].xv / 100 * c.wash.drainMax;
+  return net > 0 ? (Vov - Vt) / net * 24 : Infinity;
+}
+function toggleValve(data) {
+  const [k, which] = data.split(":"), st = S.trains[k];
+  if (which === "water") { const r = $(`#${k}_xvr`); r.scrollIntoView({ block: "nearest" }); r.focus(); return; }
+  if (which.startsWith("out")) {
+    const i = +which.slice(3);
+    if (CONFIG.trains[k].storage[i].inService !== false) st.storage[i].outOpen = !st.storage[i].outOpen;
+  }
+  else if (which.startsWith("in")) { const x = st.products[+which.slice(2)]; x.inOpen = !x.inOpen; }
+  else if (which.startsWith("suc")) { const x = st.products[+which.slice(3)]; x.sucOpen = !x.sucOpen; }
+  else if (CONFIG.trains[k].storage[+which].inService !== false) st.storage[+which].open = !st.storage[+which].open;
+  refresh();
+}
+function onHmiAct(e) {
+  const el = e.target.closest("[data-valve],[data-pump]");
+  if (!el) return;
+  if (e.type === "keydown") { if (e.key !== "Enter" && e.key !== " ") return; e.preventDefault(); }
+  const pid = el.dataset.pump;
+  if (pid === "TR") togglePump();
+  else if (pid) toggleLoad(pid.slice(1));
+  else toggleValve(el.dataset.valve);
+}
+function bindInputs() {
+  const bind = (inp, get, set, max) => {
+    inp.value = get();
+    inp.oninput = () => {
+      let v = parseFloat(inp.value); if (isNaN(v) || v < 0) v = 0;
+      if (max != null) v = Math.min(max, v);
+      set(v); refresh();
+    };
+  };
+  for (const k of KEYS) {
+    P[k].sources.forEach((x, i) => {
+      bind($(`#${k}_g${i}`), () => x.gross, v => { x.gross = v; });
+      bind($(`#${k}_b${i}`), () => x.bsw, v => { x.bsw = v; }, 100);
+    });
+    const n = $(`#${k}_xv`), r = $(`#${k}_xvr`);
+    const setXv = v => { P[k].xv = Math.round(Math.min(100, Math.max(0, v))); n.value = P[k].xv; r.value = P[k].xv; refresh(); };
+    n.value = r.value = P[k].xv;
+    n.oninput = () => setXv(parseFloat(n.value) || 0);
+    r.oninput = () => setXv(parseFloat(r.value));
+  }
+  bind($("#pumpRate"), () => pumpRate, v => { pumpRate = v; });
+  $("#pumpBtn").onclick = togglePump;
+  bind($("#loadRate"), () => loadRateM3h, v => { loadRateM3h = v; });
+  CONFIG.loading.pumps.forEach(id => { $(`#loadBtn${id}`).onclick = () => toggleLoad(id); });
+  $("#tankerReset").onclick = () => { S.load.loaded = 0; refresh(); };
+}
+function refresh() { render(collectAlarms()); drawTrend(); }
+
+/* ---------------- Loop ---------------- */
+let lastFrame = null, lastTrend = 0;
+function loop(ts) {
+  if (lastFrame == null) lastFrame = ts;
+  const realDt = Math.min(0.25, (ts - lastFrame) / 1000); lastFrame = ts;
+  if (running) {
+    let simDt = realDt * parseFloat($("#speed").value);
+    while (simDt > 0) { const d = Math.min(20, simDt); step(d); simDt -= d; }
+    render(collectAlarms());
+    if (ts - lastTrend > 300) { drawTrend(); lastTrend = ts; }
+  }
+  if (V3.on) frame3D(realDt);
+  requestAnimationFrame(loop);
+}
+function start() {
+  prepareConfig();
+  buildSVG(); buildPanel(); initState(); bindInputs(); record(); refresh();
+  $("#hmi").addEventListener("click", onHmiAct);
+  $("#hmi").addEventListener("keydown", onHmiAct);
+  $("#btnRun").onclick = () => {
+    running = !running;
+    $("#btnRun").textContent = running ? "Jeda" : "Jalankan";
+    $("#btnRun").setAttribute("aria-pressed", running);
+    $("#runStatus").textContent = running ? "Berjalan" : "Jeda";
+    $("#runStatus").classList.toggle("run", running);
+  };
+  $("#btnTheme").onclick = () => {
+    const light = document.documentElement.dataset.theme !== "light";
+    document.documentElement.dataset.theme = light ? "light" : "dark";
+    $("#btnTheme").textContent = light ? "Tampilan gelap" : "Tampilan terang";
+    drawTrend(); apply3DTheme();
+  };
+  $("#v2d").onclick = () => setView("2d");
+  $("#v3d").onclick = () => setView("3d");
+  $("#camReset").onclick = reset3DCamera;
+  $("#btnReset").onclick = () => { initState(); bindInputs(); record(); refresh(); };
+  $("#btnCsv").onclick = exportCSV;
+  document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+    trendTab = b.dataset.tab;
+    document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-pressed", x === b));
+    drawTrend();
+  });
+  window.addEventListener("resize", drawTrend);
+  requestAnimationFrame(loop);
+}
+start();
+
+</script>
+</body>
+</html>
